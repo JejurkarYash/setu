@@ -1,8 +1,8 @@
 package main
 
 import (
-	"bytes"
-	"compress/gzip"
+	"bufio"
+	"encoding/json"
 	"fmt"
 	"io"
 	"log"
@@ -12,71 +12,113 @@ import (
 	"strings"
 )
 
-const geminiBaseURL = "https://generativelanguage.googleapis.com"
+type GeminiStreamChunk struct {
+	UsageMetadata UsageMetadata `json:"usageMetadata"`
+}
+
+type UsageMetadata struct {
+	PromptTokenCount     int `json:"promptTokenCount"`
+	CandidatesTokenCount int `json:"candidatesTokenCount"`
+	TotalTokenCount      int `json:"totalTokenCount"`
+	ThoughtsTokenCount   int `json:"thoughtsTokenCount"` // Reasoning tokens!
+}
+
+// Custom ReadCloser that closes PipeWriter when the HTTP response body finishes
+type bodyWrapper struct {
+	io.Reader
+	body io.Closer
+	pw   *io.PipeWriter
+}
+
+func (b *bodyWrapper) Close() error {
+	// 1. Close the PipeWriter so io.Copy in the goroutine receives io.EOF
+	b.pw.Close()
+	// 2. Close the actual HTTP response body
+	return b.body.Close()
+}
 
 func main() {
-	fmt.Println("welcome to setu")
-
-	targetURL, err := url.Parse(geminiBaseURL)
-	if err != nil {
-		log.Fatal("Error parsing URL: ", err)
-	}
+	targetURL, _ := url.Parse("https://generativelanguage.googleapis.com")
 
 	proxy := &httputil.ReverseProxy{
+		FlushInterval: -1, // Instant streaming flush
+
 		Rewrite: func(pr *httputil.ProxyRequest) {
-			// 1. Set scheme & host to generativelanguage.googleapis.com
 			pr.Out.URL.Scheme = targetURL.Scheme
 			pr.Out.URL.Host = targetURL.Host
 			pr.Out.Host = targetURL.Host
-
-			// 2. Preserve original request Path & Query Params (e.g. ?key=...)
 			pr.Out.URL.Path = pr.In.URL.Path
 			pr.Out.URL.RawQuery = pr.In.URL.RawQuery
+			pr.Out.Header.Set("Accept-Encoding", "identity") // Plaintext streaming
 		},
 
 		ModifyResponse: func(r *http.Response) error {
-			var reader io.Reader = r.Body
+			pr, pw := io.Pipe()
 
-			// Handle gzip decompression if Gemini returns compressed data
-			if strings.EqualFold(r.Header.Get("Content-Encoding"), "gzip") {
-				gzReader, err := gzip.NewReader(r.Body)
+			// Wrap r.Body so closing r.Body also closes pw
+			r.Body = &bodyWrapper{
+				Reader: io.TeeReader(r.Body, pw),
+				body:   r.Body,
+				pw:     pw,
+			}
+
+			// Goroutine captures the intercepted stream in the background
+			go func() {
+				finalUsage, err := processStreamUsage(pr)
 				if err != nil {
-					return err
+					log.Printf("error while reading the response ", err)
+					return
 				}
-				defer gzReader.Close()
-				reader = gzReader
-			}
 
-			body, err := io.ReadAll(reader)
-			if err != nil {
-				return err
-			}
-
-			fmt.Println("\n--- GEMINI RESPONSE RECEIVED ---")
-			fmt.Println(string(body))
-
-			// Restore body for the JS client
-			r.Body = io.NopCloser(bytes.NewReader(body))
-			r.Header.Del("Content-Encoding")
-			r.ContentLength = int64(len(body))
+				fmt.Println("\n==========================================")
+				fmt.Println("📊 SETU FINAL TOKEN USAGE EXTRACTED:")
+				fmt.Printf("Input Tokens:      %d\n", finalUsage.PromptTokenCount)
+				fmt.Printf("Output Tokens:     %d\n", finalUsage.CandidatesTokenCount)
+				fmt.Printf("Reasoning Tokens:  %d\n", finalUsage.ThoughtsTokenCount)
+				fmt.Printf("Total Tokens:      %d\n", finalUsage.TotalTokenCount)
+				fmt.Println("==========================================")
+			}()
 
 			return nil
 		},
 	}
 
 	mux := http.NewServeMux()
-
-	// Wildcard route matching without trailing slash issues (Go 1.22+ wildcard format)
+	// gemini
 	mux.HandleFunc("POST /v1beta/{path...}", func(w http.ResponseWriter, r *http.Request) {
-		fmt.Printf("Incoming request: %s %s (Content-Length: %d)\n", r.Method, r.URL.Path, r.ContentLength)
+		fmt.Println("reach here ")
 		proxy.ServeHTTP(w, r)
 	})
 
-	srv := &http.Server{
-		Addr:    ":8080",
-		Handler: mux,
+	fmt.Println("Setu Proxy running on :8080...")
+	log.Fatal(http.ListenAndServe(":8080", mux))
+
+}
+
+func processStreamUsage(r io.Reader) (UsageMetadata, error) {
+	scanner := bufio.NewScanner(r)
+	var finalUsage UsageMetadata
+
+	for scanner.Scan() {
+		line := scanner.Text()
+
+		// Filter for Server-Sent Event data lines
+		if strings.HasPrefix(line, "data: ") {
+			jsonData := strings.TrimPrefix(line, "data: ")
+
+			var chunk GeminiStreamChunk
+			if err := json.Unmarshal([]byte(jsonData), &chunk); err == nil {
+				// Keep overwriting so we hold the final accurate token count
+				if chunk.UsageMetadata.TotalTokenCount > 0 {
+					finalUsage = chunk.UsageMetadata
+				}
+			}
+		}
 	}
 
-	fmt.Println("HTTP server listening on port :8080")
-	log.Fatal(srv.ListenAndServe())
+	if err := scanner.Err(); err != nil {
+		return finalUsage, err
+	}
+
+	return finalUsage, nil
 }
