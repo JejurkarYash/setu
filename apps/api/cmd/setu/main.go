@@ -1,21 +1,19 @@
 package main
 
 import (
-	"bufio"
 	"context"
-	"encoding/json"
 	"errors"
 	"io"
 	"log"
 	"net/http"
 	"os"
 	"os/signal"
-	"strings"
 	"syscall"
 	"time"
 
 	"github.com/JejurkarYash/setu/internal/config"
 	"github.com/JejurkarYash/setu/internal/logger"
+	"github.com/JejurkarYash/setu/internal/providers/gemini"
 	"github.com/JejurkarYash/setu/internal/router"
 	"github.com/JejurkarYash/setu/internal/server"
 )
@@ -60,8 +58,9 @@ func main() {
 		os.Exit(1)
 	}
 
+	geminiHandler := gemini.NewHandler(config, appLogger)
 	// router
-	router := router.NewRouter()
+	router := router.NewRouter(geminiHandler)
 	// server init
 	server, err := server.NewServer(config, router, appLogger)
 	if err != nil {
@@ -89,32 +88,4 @@ func main() {
 	cancel()
 
 	appLogger.Info("server exited properly")
-}
-
-func processStreamUsage(r io.Reader) (UsageMetadata, error) {
-	scanner := bufio.NewScanner(r)
-	var finalUsage UsageMetadata
-
-	for scanner.Scan() {
-		line := scanner.Text()
-
-		// Filter for Server-Sent Event data lines
-		if strings.HasPrefix(line, "data: ") {
-			jsonData := strings.TrimPrefix(line, "data: ")
-
-			var chunk GeminiStreamChunk
-			if err := json.Unmarshal([]byte(jsonData), &chunk); err == nil {
-				// Keep overwriting so we hold the final accurate token count
-				if chunk.UsageMetadata.TotalTokenCount > 0 {
-					finalUsage = chunk.UsageMetadata
-				}
-			}
-		}
-	}
-
-	if err := scanner.Err(); err != nil {
-		return finalUsage, err
-	}
-
-	return finalUsage, nil
 }

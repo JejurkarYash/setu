@@ -3,6 +3,7 @@ package router
 import (
 	"net/http"
 
+	"github.com/JejurkarYash/setu/internal/providers/gemini"
 	"github.com/go-chi/chi"
 )
 
@@ -10,7 +11,8 @@ type Router struct {
 	router *chi.Mux
 }
 
-func NewRouter() *chi.Mux {
+func NewRouter(geminiRouter *gemini.Handler) *chi.Mux {
+
 	r := chi.NewRouter()
 
 	// health check
@@ -20,10 +22,8 @@ func NewRouter() *chi.Mux {
 		w.Write([]byte("Server is running..."))
 	})
 
+	// mounting the gemini sub-routes
+	r.Mount("/v1beta", geminiRouter.Routes())
+
 	return r
-}
-
-func RegisterRoutes() error {
-
-	return nil
 }

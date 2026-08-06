@@ -13,6 +13,7 @@ import (
 type Config struct {
 	Primary Primary      `kaonf:"primary"`
 	Server  ServerConfig `koanf:"server"`
+	Gemini  Gemini       `koanf:"gemini"`
 }
 
 type Primary struct {
@@ -25,6 +26,10 @@ type ServerConfig struct {
 	WriteTimeout       int      `koanf:"writeTimeout"`
 	IdleTimeout        int      `koanf:"idleTimeout"`
 	CORSAllowedOrigins []string `koanf:"corsAllowedOrigins"`
+}
+
+type Gemini struct {
+	APIKey string
 }
 
 func LoadConfig() (*Config, error) {
