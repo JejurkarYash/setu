@@ -45,7 +45,6 @@ func NewHandler(cfg *config.Config, logger *slog.Logger) *Handler {
 
 // registering the subroute
 func (h *Handler) Routes() chi.Router {
-	h.logger.Debug("inside the routes")
 	r := chi.NewRouter()
 	r.Post("/models/{path...}", h.handleProxyRequest)
 

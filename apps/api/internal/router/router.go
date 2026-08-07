@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/JejurkarYash/setu/internal/providers/gemini"
+	"github.com/JejurkarYash/setu/internal/providers/openai"
 	"github.com/go-chi/chi"
 )
 
@@ -11,7 +12,7 @@ type Router struct {
 	router *chi.Mux
 }
 
-func NewRouter(geminiRouter *gemini.Handler) *chi.Mux {
+func NewRouter(geminiRouter *gemini.Handler, openAIRouter *openai.Handler) *chi.Mux {
 
 	r := chi.NewRouter()
 
@@ -24,6 +25,8 @@ func NewRouter(geminiRouter *gemini.Handler) *chi.Mux {
 
 	// mounting the gemini sub-routes
 	r.Mount("/v1beta", geminiRouter.Routes())
+	// mounting the openai sub-routes
+	r.Mount("/v1", openAIRouter.Routes())
 
 	return r
 }

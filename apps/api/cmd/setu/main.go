@@ -14,6 +14,7 @@ import (
 	"github.com/JejurkarYash/setu/internal/config"
 	"github.com/JejurkarYash/setu/internal/logger"
 	"github.com/JejurkarYash/setu/internal/providers/gemini"
+	"github.com/JejurkarYash/setu/internal/providers/openai"
 	"github.com/JejurkarYash/setu/internal/router"
 	"github.com/JejurkarYash/setu/internal/server"
 )
@@ -58,9 +59,13 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Handlers init
 	geminiHandler := gemini.NewHandler(config, appLogger)
-	// router
-	router := router.NewRouter(geminiHandler)
+	openAIHandler := openai.NewHandler(config, appLogger)
+
+	// passing LLM provider's handlers to router to register routes
+	router := router.NewRouter(geminiHandler, openAIHandler)
+	
 	// server init
 	server, err := server.NewServer(config, router, appLogger)
 	if err != nil {
