@@ -13,6 +13,7 @@ import (
 
 	"github.com/JejurkarYash/setu/internal/config"
 	"github.com/JejurkarYash/setu/internal/logger"
+	"github.com/JejurkarYash/setu/internal/providers/anthropic"
 	"github.com/JejurkarYash/setu/internal/providers/gemini"
 	"github.com/JejurkarYash/setu/internal/providers/openai"
 	"github.com/JejurkarYash/setu/internal/router"
@@ -62,10 +63,10 @@ func main() {
 	// Handlers init
 	geminiHandler := gemini.NewHandler(config, appLogger)
 	openAIHandler := openai.NewHandler(config, appLogger)
-
+	anthropicHandler := anthropic.NewHandler(config, appLogger)
 	// passing LLM provider's handlers to router to register routes
-	router := router.NewRouter(geminiHandler, openAIHandler)
-	
+	router := router.NewRouter(geminiHandler, openAIHandler, anthropicHandler)
+
 	// server init
 	server, err := server.NewServer(config, router, appLogger)
 	if err != nil {

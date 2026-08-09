@@ -68,7 +68,6 @@ func (h *Handler) InjectAPI(pr *httputil.ProxyRequest) error {
 	// for testing -> fetching key from env
 	// once the middleware implemented will get the real key from request context
 	realKey := h.cfg.Gemini.APIKey
-
 	q := pr.Out.URL.Query()
 	q.Del("key")
 

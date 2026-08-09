@@ -1,4 +1,4 @@
-package openai
+package anthropic
 
 import (
 	"bufio"
@@ -20,68 +20,59 @@ type Handler struct {
 	proxy  *httputil.ReverseProxy
 }
 
-type OpenAIStreamResponse struct {
-	Response struct {
-		Usage struct {
-			InputToken  int `json:"input_tokens"`
-			OutputToken int `json:"output_tokens"`
-			TotalToken  int `json:"total_tokens"`
-		}
-	}
-}
-
-type OpenAIJSONResponse struct {
+// non Streaming
+type AnthropicJSONResponse struct {
 	Usage struct {
 		InputToken  int `json:"input_tokens"`
 		OutputToken int `json:"output_tokens"`
-		TotalToken  int `json:"total_tokens"`
 	}
 }
 
-// openai handler init
+// Streaming
+type AnthropicSSEResponse struct {
+	Message struct {
+		Usage struct {
+			InputToken int `json:"input_tokens"`
+		}
+	}
+	Usage struct {
+		OutputToken int `json:"output_tokens"`
+	}
+}
+
 func NewHandler(cfg *config.Config, logger *slog.Logger) *Handler {
 	h := &Handler{
 		cfg:    cfg,
 		logger: logger,
 	}
-
 	proxy := proxy.NewProxyEngine(h, logger)
 	h.proxy = proxy.SetupProxyEngine()
 
 	return h
 }
 
-// registering the sub-router
 func (h *Handler) Routes() chi.Router {
 	r := chi.NewRouter()
-	r.Post("/chat/completions", h.handleProxyRequest)
+
+	r.Post("/v1/{path...}", h.handleProxyRequest)
+
 	return r
 }
 
 func (h *Handler) handleProxyRequest(w http.ResponseWriter, r *http.Request) {
-	h.logger.Debug("open ai route hit")
-	// serving the request
+	h.logger.Debug("Anthropic Request hit")
 	h.proxy.ServeHTTP(w, r)
 }
 
-// interface methods
 func (h *Handler) TargetURL() string {
-	return "http://localhost:8081"
+	return "http://localhost:8081" // => testing purpose change it later
 }
 
 func (h *Handler) InjectAPI(pr *httputil.ProxyRequest) error {
-	var key string
-	// attaching the OPENAI_API_KEY
-	originalKey := pr.In.Context().Value("api_key") // -> extract it from context
-	if keyStr, ok := originalKey.(string); ok {
-		key = keyStr
-	}
 
-	pr.Out.Header.Set("Authorization", "Bearer "+key)
 	return nil
 }
 
-// parsing the response based on response content type
 func (h *Handler) Parser(r io.Reader, contentType string) (int, int, error) {
 	if strings.Contains(contentType, "application/json") {
 		return h.parseJSONResponse(r)
@@ -89,12 +80,10 @@ func (h *Handler) Parser(r io.Reader, contentType string) (int, int, error) {
 	return h.parseSSEChunks(r)
 }
 
-// parser methods
-// parsing the stream response
+// parsing methods
 func (h *Handler) parseSSEChunks(r io.Reader) (int, int, error) {
-	// creating scanner
 	scanner := bufio.NewScanner(r)
-	var inputToken, outputToken int
+	var inputToken, outputToekn int
 
 	for scanner.Scan() {
 		line := scanner.Text()
@@ -102,15 +91,13 @@ func (h *Handler) parseSSEChunks(r io.Reader) (int, int, error) {
 		if strings.Contains(line, "usage") {
 
 			jsonData := strings.TrimPrefix(line, "data: ")
-			var chunk OpenAIStreamResponse
 
-			if err := json.Unmarshal([]byte(jsonData), &chunk); err == nil {
-
-				// total token count should greater than 0
-				if chunk.Response.Usage.TotalToken > 0 {
-					inputToken = chunk.Response.Usage.InputToken
-					outputToken = chunk.Response.Usage.OutputToken
+			var resp AnthropicSSEResponse
+			if err := json.Unmarshal([]byte(jsonData), &resp); err == nil {
+				if resp.Message.Usage.InputToken > 0 {
+					inputToken = resp.Message.Usage.InputToken
 				}
+				outputToekn = resp.Usage.OutputToken
 
 			}
 		}
@@ -120,12 +107,12 @@ func (h *Handler) parseSSEChunks(r io.Reader) (int, int, error) {
 		return 0, 0, err
 	}
 
-	return inputToken, outputToken, nil
+	return inputToken, outputToekn, nil
 }
 
-// parsing the non stream response
 func (h *Handler) parseJSONResponse(r io.Reader) (int, int, error) {
-	var resp OpenAIJSONResponse
+	var resp AnthropicJSONResponse
+
 	if err := json.NewDecoder(r).Decode(&resp); err != nil {
 		return 0, 0, err
 	}
