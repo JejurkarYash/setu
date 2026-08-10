@@ -10,8 +10,12 @@ require (
 )
 
 require (
+	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/go-viper/mapstructure/v2 v2.4.0 // indirect
 	github.com/knadh/koanf/maps v0.1.2 // indirect
 	github.com/mitchellh/copystructure v1.2.0 // indirect
 	github.com/mitchellh/reflectwalk v1.0.2 // indirect
+	github.com/redis/go-redis/v9 v9.22.0 // indirect
+	go.uber.org/atomic v1.11.0 // indirect
+	golang.org/x/sys v0.30.0 // indirect
 )

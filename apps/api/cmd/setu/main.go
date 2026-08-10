@@ -16,6 +16,7 @@ import (
 	"github.com/JejurkarYash/setu/internal/providers/anthropic"
 	"github.com/JejurkarYash/setu/internal/providers/gemini"
 	"github.com/JejurkarYash/setu/internal/providers/openai"
+	"github.com/JejurkarYash/setu/internal/redis"
 	"github.com/JejurkarYash/setu/internal/router"
 	"github.com/JejurkarYash/setu/internal/server"
 )
@@ -60,15 +61,22 @@ func main() {
 		os.Exit(1)
 	}
 
+	// redis init
+	rdb, err := redis.NewClient(config.Redis.Address)
+	if err != nil {
+		appLogger.Error("failed to init redis")
+	}
+	appLogger.Debug("redis is connected...")
+
 	// Handlers init
-	geminiHandler := gemini.NewHandler(config, appLogger)
-	openAIHandler := openai.NewHandler(config, appLogger)
-	anthropicHandler := anthropic.NewHandler(config, appLogger)
+	geminiHandler := gemini.NewHandler(config, appLogger, rdb)
+	openAIHandler := openai.NewHandler(config, appLogger, rdb)
+	anthropicHandler := anthropic.NewHandler(config, appLogger, rdb)
 	// passing LLM provider's handlers to router to register routes
 	router := router.NewRouter(geminiHandler, openAIHandler, anthropicHandler)
 
 	// server init
-	server, err := server.NewServer(config, router, appLogger)
+	server, err := server.NewServer(config, router, appLogger, rdb)
 	if err != nil {
 		appLogger.Error("failed to start HTTP server")
 		os.Exit(1)

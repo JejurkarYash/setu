@@ -2,6 +2,7 @@ package gemini
 
 import (
 	"bufio"
+	"context"
 	"encoding/json"
 	"io"
 	"log/slog"
@@ -9,8 +10,10 @@ import (
 	"net/http/httputil"
 	"strings"
 
+	"github.com/JejurkarYash/setu/internal/billing"
 	"github.com/JejurkarYash/setu/internal/config"
 	"github.com/JejurkarYash/setu/internal/proxy"
+	"github.com/JejurkarYash/setu/internal/redis"
 	"github.com/go-chi/chi"
 )
 
@@ -18,6 +21,7 @@ type Handler struct {
 	cfg    *config.Config
 	logger *slog.Logger
 	proxy  *httputil.ReverseProxy
+	rdb    *redis.Client
 }
 
 // gemini response
@@ -30,10 +34,11 @@ type GeminiResponse struct {
 }
 
 // gemini handler init
-func NewHandler(cfg *config.Config, logger *slog.Logger) *Handler {
+func NewHandler(cfg *config.Config, logger *slog.Logger, rdb *redis.Client) *Handler {
 	h := &Handler{
 		cfg:    cfg,
 		logger: logger,
+		rdb:    rdb,
 	}
 
 	// getting the newproxy engine
@@ -76,6 +81,44 @@ func (h *Handler) InjectAPI(pr *httputil.ProxyRequest) error {
 	return nil
 }
 
+// update the redis counter
+func (h *Handler) UpdateSpend(ctx context.Context, inputToken, outputToken int) error {
+	var model string
+	var projectID string
+
+	modelName := ctx.Value("modelName")
+	project_id := ctx.Value("projectID")
+
+	if modelNameStr, ok := modelName.(string); ok {
+		model = modelNameStr
+	} else {
+		model = "gemini-3.5-flash"
+	}
+
+	if projectIDStr, ok := project_id.(string); ok {
+		projectID = projectIDStr
+	} else {
+		projectID = "test:123"
+	}
+
+	totalCost := billing.CalculateCost(model, inputToken, outputToken)
+
+	// logging for debug
+	h.logger.Info("Calculated request cost ",
+		slog.String("model", model),
+		slog.Float64("cost", totalCost),
+		slog.Int("input_tokens", inputToken),
+		slog.Int("output_tokens", outputToken))
+
+	if err := h.rdb.IncrSpend(ctx, model, projectID, totalCost); err != nil {
+		h.logger.Error("failed to update redis spend", slog.Any("err", err))
+		return err
+	}
+
+	return nil
+}
+
+// parsing
 func (h *Handler) Parser(r io.Reader, contentType string) (int, int, error) {
 	if strings.Contains(contentType, "text/event-stream") {
 		return h.parseSSEChunks(r)

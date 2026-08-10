@@ -2,6 +2,7 @@ package openai
 
 import (
 	"bufio"
+	"context"
 	"encoding/json"
 	"io"
 	"log/slog"
@@ -9,8 +10,10 @@ import (
 	"net/http/httputil"
 	"strings"
 
+	"github.com/JejurkarYash/setu/internal/billing"
 	"github.com/JejurkarYash/setu/internal/config"
 	"github.com/JejurkarYash/setu/internal/proxy"
+	"github.com/JejurkarYash/setu/internal/redis"
 	"github.com/go-chi/chi"
 )
 
@@ -18,6 +21,7 @@ type Handler struct {
 	cfg    *config.Config
 	logger *slog.Logger
 	proxy  *httputil.ReverseProxy
+	rdb    *redis.Client
 }
 
 type OpenAIStreamResponse struct {
@@ -39,10 +43,11 @@ type OpenAIJSONResponse struct {
 }
 
 // openai handler init
-func NewHandler(cfg *config.Config, logger *slog.Logger) *Handler {
+func NewHandler(cfg *config.Config, logger *slog.Logger, rdb *redis.Client) *Handler {
 	h := &Handler{
 		cfg:    cfg,
 		logger: logger,
+		rdb:    rdb,
 	}
 
 	proxy := proxy.NewProxyEngine(h, logger)
@@ -78,6 +83,43 @@ func (h *Handler) InjectAPI(pr *httputil.ProxyRequest) error {
 	}
 
 	pr.Out.Header.Set("Authorization", "Bearer "+key)
+	return nil
+}
+
+// update redis spend
+func (h *Handler) UpdateSpend(ctx context.Context, inputToken, outputToken int) error {
+	var model string
+	var projectID string
+
+	modelName := ctx.Value("modelName")
+	project_id := ctx.Value("projectID")
+
+	if modelNameStr, ok := modelName.(string); ok {
+		model = modelNameStr
+	} else { // --> else block of for only testing purpose need to replace it later
+		model = "gpt-5.5"
+	}
+
+	if projectIDStr, ok := project_id.(string); ok {
+		projectID = projectIDStr
+	} else { // --> else block of for only testing purpose need to replace it later
+		projectID = "test:ABC"
+	}
+
+	totalCost := billing.CalculateCost(model, inputToken, outputToken)
+
+	// loggin for debug
+	h.logger.Info("Calculated request cost",
+		slog.String("model", model),
+		slog.Float64("cost", totalCost),
+		slog.Int("input_tokens", inputToken),
+		slog.Int("ouput_tokens", outputToken))
+
+	if err := h.rdb.IncrSpend(ctx, model, projectID, totalCost); err != nil {
+		h.logger.Error("failed to update redis spend", slog.Any("err", err))
+		return err
+	}
+
 	return nil
 }
 

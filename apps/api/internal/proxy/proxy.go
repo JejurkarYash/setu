@@ -1,7 +1,7 @@
 package proxy
 
 import (
-	"fmt"
+	"context"
 	"io"
 	"log/slog"
 	"net/http"
@@ -14,6 +14,8 @@ type Provider interface {
 	TargetURL() string                                        // -> url
 	InjectAPI(pr *httputil.ProxyRequest) error                // -> injecting the API
 	Parser(r io.Reader, contentType string) (int, int, error) // -> reading the input and output tokens
+
+	UpdateSpend(ctx context.Context, inputToken, outputToken int) error // -> update the redis counter
 }
 
 type bodyWrapper struct {
@@ -72,16 +74,21 @@ func (e *Engine) SetupProxyEngine() *httputil.ReverseProxy {
 
 			contentType := r.Header.Get("Content-Type")
 
+			// copying the request context to new context
+			// cause our updateSpend runs in the background so after response is send to client
+			// it cancel the main reuqqest context
+			detachedCtx := context.WithoutCancel(r.Request.Context())
+
 			// run in the background
 			go func() {
 
-				input, output, err := e.provider.Parser(pr, contentType) // -> llm specific provider
+				inputToken, outputToken, err := e.provider.Parser(pr, contentType) // -> llm specific provider
 				if err != nil {
 					e.Logger.Error("failed to parse tokens", slog.Any("error", err))
 				}
 
-				fmt.Println("inputToken :", input)
-				fmt.Println("outputToken :", output)
+				// passing this token to calculate or update the redis part
+				e.provider.UpdateSpend(detachedCtx, inputToken, outputToken)
 			}()
 			return nil
 		},

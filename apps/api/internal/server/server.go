@@ -7,6 +7,7 @@ import (
 	"net/http"
 
 	"github.com/JejurkarYash/setu/internal/config"
+	"github.com/JejurkarYash/setu/internal/redis"
 	"github.com/go-chi/chi"
 )
 
@@ -17,17 +18,16 @@ type Server struct {
 	httpServer *http.Server
 }
 
-func NewServer(cfg *config.Config, handler *chi.Mux, logger *slog.Logger) (*Server, error) {
+func NewServer(cfg *config.Config, handler *chi.Mux, logger *slog.Logger, rdb *redis.Client) (*Server, error) {
 	return &Server{
 		Config: cfg,
 		Logger: logger,
 		httpServer: &http.Server{
-			Addr: fmt.Sprintf(":%d", cfg.Server.Port),
-			Handler:handler, 
+			Addr:    fmt.Sprintf(":%d", cfg.Server.Port),
+			Handler: handler,
 		},
 	}, nil
 }
-
 
 // starting the server
 func (s *Server) Start() error {
@@ -43,5 +43,6 @@ func (s *Server) Stop(ctx context.Context) error {
 	if err := s.httpServer.Shutdown(ctx); err != nil {
 		return fmt.Errorf("failed to stop the HTTP Server:%w", err)
 	}
+	s.Logger.Debug("shutting down the server...")
 	return nil
 }

@@ -14,6 +14,7 @@ type Config struct {
 	Primary Primary      `kaonf:"primary"`
 	Server  ServerConfig `koanf:"server"`
 	Gemini  Gemini       `koanf:"gemini"`
+	Redis   RedisConfig  `kaonf:"redis"`
 }
 
 type Primary struct {
@@ -27,7 +28,9 @@ type ServerConfig struct {
 	IdleTimeout        int      `koanf:"idleTimeout"`
 	CORSAllowedOrigins []string `koanf:"corsAllowedOrigins"`
 }
-
+type RedisConfig struct {
+	Address string `koanf:"address"`
+}
 type Gemini struct {
 	APIKey string
 }
