@@ -11,10 +11,11 @@ import (
 )
 
 type Config struct {
-	Primary Primary      `kaonf:"primary"`
-	Server  ServerConfig `koanf:"server"`
-	Gemini  Gemini       `koanf:"gemini"`
-	Redis   RedisConfig  `kaonf:"redis"`
+	Primary  Primary        `kaonf:"primary"`
+	Server   ServerConfig   `koanf:"server"`
+	Gemini   Gemini         `koanf:"gemini"`
+	Redis    RedisConfig    `koanf:"redis"`
+	Database DatabaseConfig `koanf:"database"`
 }
 
 type Primary struct {
@@ -35,6 +36,19 @@ type Gemini struct {
 	APIKey string
 }
 
+type DatabaseConfig struct {
+	Host            string `koanf:"host"`
+	Port            int    `koanf:"port"`
+	User            string `koanf:"user"`
+	Password        string `koanf:"password"`
+	DBName          string `koanf:"dbname"`
+	SSLMode         string `koanf:"sslMode"`
+	MaxOpenConns    int    `koanf:"maxOpenConns"`
+	MaxIdleConns    int    `koanf:"maxIdleConns"`
+	ConnMaxLifetime int    `koanf:"connMaxLifetime"`
+	ConnMaxIdleTime int    `koanf:"connMaxIdleTime"`
+}
+
 func LoadConfig() (*Config, error) {
 	var programLevel = new(slog.Level)
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: programLevel}))
@@ -45,7 +59,7 @@ func LoadConfig() (*Config, error) {
 		return strings.ToLower(strings.TrimPrefix(s, "SETU_"))
 	}), nil)
 	if err != nil {
-		logger.Error("failed to load the config", err)
+		logger.Error("failed to load the config", slog.Any("err", err))
 		return nil, err
 	}
 

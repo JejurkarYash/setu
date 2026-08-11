@@ -61,17 +61,19 @@ func main() {
 		os.Exit(1)
 	}
 
-	// redis init
+	// redis initalization
 	rdb, err := redis.NewClient(config.Redis.Address)
 	if err != nil {
 		appLogger.Error("failed to init redis")
 	}
 	appLogger.Debug("redis is connected...")
 
+
 	// Handlers init
 	geminiHandler := gemini.NewHandler(config, appLogger, rdb)
 	openAIHandler := openai.NewHandler(config, appLogger, rdb)
 	anthropicHandler := anthropic.NewHandler(config, appLogger, rdb)
+	
 	// passing LLM provider's handlers to router to register routes
 	router := router.NewRouter(geminiHandler, openAIHandler, anthropicHandler)
 
