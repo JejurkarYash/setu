@@ -55,6 +55,17 @@ func LoadConfig() (*Config, error) {
 
 	k := koanf.New(".")
 
+	mainConfig := &Config{
+		Database: DatabaseConfig{
+			Port: 5432,
+			Host: "localhost",
+			// pool config
+			MaxIdleConns:    25,
+			ConnMaxLifetime: 5 * 60, // 5 minutes
+			ConnMaxIdleTime: 5 * 60,
+		},
+	}
+
 	err := k.Load(env.Provider("SETU", ".", func(s string) string {
 		return strings.ToLower(strings.TrimPrefix(s, "SETU_"))
 	}), nil)
@@ -63,11 +74,9 @@ func LoadConfig() (*Config, error) {
 		return nil, err
 	}
 
-	mainConfig := &Config{}
-
 	err = k.Unmarshal("", mainConfig)
 	if err != nil {
-		logger.Error("failed to unmarshal env variables", err)
+		logger.Error("failed to unmarshal env variables", slog.Any("err", err))
 		return nil, err
 	}
 

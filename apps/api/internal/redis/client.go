@@ -2,6 +2,7 @@ package redis
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/redis/go-redis/v9"
 )
@@ -11,13 +12,16 @@ type Client struct {
 }
 
 func NewClient(addr string) (*Client, error) {
+
+	fmt.Println("Addr:", addr)
+
 	rdb := redis.NewClient(&redis.Options{
 		Addr: addr,
 	})
 
 	// ping the redis to make sure connection is alive
 	if err := rdb.Ping(context.Background()).Err(); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to ping redis:%w", err)
 	}
 	return &Client{
 		rdb: rdb,

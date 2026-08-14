@@ -2,11 +2,13 @@ package server
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
 
 	"github.com/JejurkarYash/setu/internal/config"
+	"github.com/JejurkarYash/setu/internal/database"
 	"github.com/JejurkarYash/setu/internal/redis"
 	"github.com/go-chi/chi"
 )
@@ -16,12 +18,21 @@ type Server struct {
 	Router     *chi.Mux
 	Logger     *slog.Logger
 	httpServer *http.Server
+	dbPool     *database.Database
 }
 
 func NewServer(cfg *config.Config, handler *chi.Mux, logger *slog.Logger, rdb *redis.Client) (*Server, error) {
+
+	// database init
+	db, err := database.New(cfg, logger)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialized database:%w", err)
+	}
+
 	return &Server{
 		Config: cfg,
 		Logger: logger,
+		dbPool: db,
 		httpServer: &http.Server{
 			Addr:    fmt.Sprintf(":%d", cfg.Server.Port),
 			Handler: handler,
@@ -40,6 +51,14 @@ func (s *Server) Start() error {
 
 // handling graceful shutdown
 func (s *Server) Stop(ctx context.Context) error {
+	if s.httpServer == nil {
+		return errors.New("HTTP Server is not initialized")
+	}
+
+	// clost the db first
+	s.dbPool.Close()
+	// clossing the server finally
+
 	if err := s.httpServer.Shutdown(ctx); err != nil {
 		return fmt.Errorf("failed to stop the HTTP Server:%w", err)
 	}

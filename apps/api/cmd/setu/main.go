@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io"
 	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
@@ -64,23 +65,23 @@ func main() {
 	// redis initalization
 	rdb, err := redis.NewClient(config.Redis.Address)
 	if err != nil {
-		appLogger.Error("failed to init redis")
+		appLogger.Error("failed to init redis", slog.Any("err", err))
+	} else {
+		appLogger.Debug("redis is connected...")
 	}
-	appLogger.Debug("redis is connected...")
-
 
 	// Handlers init
 	geminiHandler := gemini.NewHandler(config, appLogger, rdb)
 	openAIHandler := openai.NewHandler(config, appLogger, rdb)
 	anthropicHandler := anthropic.NewHandler(config, appLogger, rdb)
-	
+
 	// passing LLM provider's handlers to router to register routes
 	router := router.NewRouter(geminiHandler, openAIHandler, anthropicHandler)
 
 	// server init
 	server, err := server.NewServer(config, router, appLogger, rdb)
 	if err != nil {
-		appLogger.Error("failed to start HTTP server")
+		appLogger.Error("failed to start HTTP server", slog.Any("err", err))
 		os.Exit(1)
 	}
 
