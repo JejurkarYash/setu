@@ -2,17 +2,29 @@ package database
 
 import (
 	"context"
+	"database/sql"
+	"embed"
 	"fmt"
 	"log/slog"
 	"time"
 
 	"github.com/JejurkarYash/setu/internal/config"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/pressly/goose/v3"
+
+	// anonymous import to register pgx driver to goose
+	_ "github.com/jackc/pgx/v5/stdlib"
 )
+
+// embedding the migrations
+//
+//go:embed migrations/*.sql
+var embeddedMigrations embed.FS
 
 type Database struct {
 	pool   *pgxpool.Pool
 	logger *slog.Logger
+	dsn    string
 }
 
 func New(cfg *config.Config, logger *slog.Logger) (*Database, error) {
@@ -55,10 +67,45 @@ func New(cfg *config.Config, logger *slog.Logger) (*Database, error) {
 
 	logger.Debug("PostgreSQL connection pool initialized succesfully")
 
-	return &Database{
+	db := &Database{
 		pool:   pool,
 		logger: logger,
-	}, nil
+		dsn:    dsn,
+	}
+
+	// running migrations
+	if err := db.RunMigrations(); err != nil {
+		return nil, fmt.Errorf("failed to run database migrations:%w", err)
+	}
+
+	return db, nil
+}
+
+func (db *Database) RunMigrations() error {
+
+	db.logger.Debug("Running database migrations...")
+
+	// goose reqquires a database/sql connection
+	// opening temproary connection
+
+	sqlDB, err := sql.Open("pgx", db.dsn)
+	if err != nil {
+		return fmt.Errorf("failed to open sql connection for migrations:%w", err)
+	}
+	defer sqlDB.Close()
+
+	// direct goose to load the sql from the embeed
+	goose.SetBaseFS(embeddedMigrations)
+	if err := goose.SetDialect("postgres"); err != nil {
+		return err
+	}
+
+	// exectuting migrations
+	if err := goose.Up(sqlDB, "migrations"); err != nil {
+		return fmt.Errorf("failed to apply migrations:%w", err)
+	}
+
+	return nil
 }
 
 // method to handle graceful shutdown
