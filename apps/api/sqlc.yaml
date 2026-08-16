@@ -1,0 +1,15 @@
+version: "2"
+sql:
+  # pointing to database schema  
+ - schema: "internal/database/migrations"
+  # pointing to queries
+   queries: "internal/database/queries"
+   engine: "postgresql"
+
+   gen:
+     go:
+      package: "dbgen"
+      # output directory
+      out: "internal/database/dbgen"
+      # sql package 
+      sql_package: "pgx/v5"
