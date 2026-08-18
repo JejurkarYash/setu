@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/JejurkarYash/setu/internal/config"
+	"github.com/JejurkarYash/setu/internal/database/dbgen"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/pressly/goose/v3"
 
@@ -22,9 +23,10 @@ import (
 var embeddedMigrations embed.FS
 
 type Database struct {
-	pool   *pgxpool.Pool
-	logger *slog.Logger
-	dsn    string
+	pool    *pgxpool.Pool
+	logger  *slog.Logger
+	dsn     string
+	Queries *dbgen.Queries
 }
 
 func New(cfg *config.Config, logger *slog.Logger) (*Database, error) {
@@ -68,9 +70,10 @@ func New(cfg *config.Config, logger *slog.Logger) (*Database, error) {
 	logger.Debug("PostgreSQL connection pool initialized succesfully")
 
 	db := &Database{
-		pool:   pool,
-		logger: logger,
-		dsn:    dsn,
+		pool:    pool,
+		logger:  logger,
+		dsn:     dsn,
+		Queries: dbgen.New(pool),
 	}
 
 	// running migrations

@@ -9,7 +9,7 @@ import (
 )
 
 type AlertSetting struct {
-	ID                  pgtype.UUID
+	ID                  string
 	ProjectID           pgtype.UUID
 	SlackWebhookUrl     pgtype.Text
 	EmailNotification   pgtype.Text
@@ -18,8 +18,8 @@ type AlertSetting struct {
 }
 
 type ApiKey struct {
-	ID         pgtype.UUID
-	ProjectID  pgtype.UUID
+	ID         string
+	ProjectID  string
 	KeyPrefix  string
 	KeyHash    string
 	IsActive   bool
@@ -30,7 +30,7 @@ type ApiKey struct {
 }
 
 type ModelRate struct {
-	ID                     pgtype.UUID
+	ID                     string
 	Provider               string
 	ModelName              string
 	PromptTokenCostUsd     pgtype.Numeric
@@ -39,16 +39,16 @@ type ModelRate struct {
 }
 
 type Project struct {
-	ID            pgtype.UUID
+	ID            string
 	Name          string
-	MonthlyBudget pgtype.Numeric
+	MonthlyBudget float64
 	CreatedAt     pgtype.Timestamptz
 	UpdatedAt     pgtype.Timestamptz
 }
 
 type ProviderKey struct {
-	ID           pgtype.UUID
-	ProjectID    pgtype.UUID
+	ID           string
+	ProjectID    string
 	Provider     string
 	EncryptedKey []byte
 	Nonce        []byte
@@ -58,18 +58,18 @@ type ProviderKey struct {
 }
 
 type UsageLog struct {
-	ID               pgtype.UUID
+	ID               string
 	ProjectID        pgtype.UUID
 	Model            string
 	PromptTokens     int32
 	CompletionTokens int32
-	CostUsd          pgtype.Numeric
+	CostUsd          float64
 	StatusCode       int32
 	CreatedAt        pgtype.Timestamptz
 }
 
 type User struct {
-	ID        pgtype.UUID
+	ID        string
 	GoogleID  string
 	Email     string
 	Name      string

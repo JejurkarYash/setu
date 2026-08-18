@@ -13,3 +13,8 @@ sql:
       out: "internal/database/dbgen"
       # sql package 
       sql_package: "pgx/v5"
+      overrides:
+        - db_type: "pg_catalog.numeric"
+          go_type: "float64"
+        - db_type: "uuid"
+          go_type: "string"

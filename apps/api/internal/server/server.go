@@ -21,13 +21,7 @@ type Server struct {
 	dbPool     *database.Database
 }
 
-func NewServer(cfg *config.Config, handler *chi.Mux, logger *slog.Logger, rdb *redis.Client) (*Server, error) {
-
-	// database init
-	db, err := database.New(cfg, logger)
-	if err != nil {
-		return nil, fmt.Errorf("failed to initialized database:%w", err)
-	}
+func NewServer(cfg *config.Config, handler *chi.Mux, logger *slog.Logger, rdb *redis.Client, db *database.Database) (*Server, error) {
 
 	return &Server{
 		Config: cfg,
