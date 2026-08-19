@@ -14,6 +14,7 @@ import (
 
 	"github.com/JejurkarYash/setu/internal/config"
 	"github.com/JejurkarYash/setu/internal/database"
+	"github.com/JejurkarYash/setu/internal/lib/utils"
 	"github.com/JejurkarYash/setu/internal/logger"
 	"github.com/JejurkarYash/setu/internal/middleware"
 	"github.com/JejurkarYash/setu/internal/providers/anthropic"
@@ -83,8 +84,10 @@ func main() {
 	openAIHandler := openai.NewHandler(config, appLogger, rdb)
 	anthropicHandler := anthropic.NewHandler(config, appLogger, rdb)
 
+	// creating new encrytor
+	encryptor, _ := utils.NewEncryptor(config.Encryption.MasterKey); 
 	// middleware init
-	middleware := middleware.NewMiddleware(db, rdb, appLogger)
+	middleware := middleware.NewMiddleware(db, rdb, appLogger,encryptor)
 	// passing LLM provider's handlers to router to register routes
 	router := router.NewRouter(geminiHandler, openAIHandler, anthropicHandler, *middleware)
 

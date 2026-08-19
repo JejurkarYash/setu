@@ -11,11 +11,12 @@ import (
 )
 
 type Config struct {
-	Primary  Primary        `kaonf:"primary"`
-	Server   ServerConfig   `koanf:"server"`
-	Gemini   Gemini         `koanf:"gemini"`
-	Redis    RedisConfig    `koanf:"redis"`
-	Database DatabaseConfig `koanf:"database"`
+	Primary    Primary          `kaonf:"primary"`
+	Server     ServerConfig     `koanf:"server"`
+	Gemini     Gemini           `koanf:"gemini"`
+	Redis      RedisConfig      `koanf:"redis"`
+	Database   DatabaseConfig   `koanf:"database"`
+	Encryption EncryptionConfig `koanf:"encryption"`
 }
 
 type Primary struct {
@@ -34,6 +35,10 @@ type RedisConfig struct {
 }
 type Gemini struct {
 	APIKey string
+}
+
+type EncryptionConfig struct {
+	MasterKey string `koanf:"masterKey"`
 }
 
 type DatabaseConfig struct {

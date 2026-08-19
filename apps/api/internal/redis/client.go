@@ -42,10 +42,19 @@ func (c *Client) IncrSpend(ctx context.Context, model, projectID string, amount 
 	return c.rdb.IncrByFloat(ctx, key, amount).Err()
 }
 
-// method to check the budge
-func (c *Client) GetSpend(ctx context.Context, projectID string) bool {
+// method to check the budget
+func (c *Client) GetSpend(ctx context.Context, projectID string) (float64, error) {
+	key := "project:" + projectID + ":spend"
+	val, err := c.rdb.Get(ctx, key).Float64()
+	if err == redis.Nil {
+		return 0.0, nil
+	}
 
-	return false
+	if err != nil {
+		return 0.0, fmt.Errorf("error getting spend: %w", err)
+	}
+
+	return val, nil
 }
 
 // auth middleware methods
