@@ -4,3 +4,6 @@ tasks:
   run: 
     cmds:
        - go run ./cmd/setu/main.go
+  seed:
+    cmds:
+       - go run ./cmd/seed/main.go

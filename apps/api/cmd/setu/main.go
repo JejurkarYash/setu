@@ -115,7 +115,8 @@ func main() {
 
 	}
 	stop()
-	cancel()
+	cancel() 
 
 	appLogger.Info("server exited properly")
+
 }

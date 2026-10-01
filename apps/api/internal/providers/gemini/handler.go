@@ -12,6 +12,7 @@ import (
 
 	"github.com/JejurkarYash/setu/internal/billing"
 	"github.com/JejurkarYash/setu/internal/config"
+	"github.com/JejurkarYash/setu/internal/middleware"
 	"github.com/JejurkarYash/setu/internal/proxy"
 	"github.com/JejurkarYash/setu/internal/redis"
 	"github.com/go-chi/chi"
@@ -51,14 +52,24 @@ func NewHandler(cfg *config.Config, logger *slog.Logger, rdb *redis.Client) *Han
 // registering the subroute
 func (h *Handler) Routes() chi.Router {
 	r := chi.NewRouter()
-	r.Post("/models/{path...}", h.handleProxyRequest)
+	r.Post("/models/*", h.handleProxyRequest)
 
 	return r
 }
 
 // handling the proxy
 func (h *Handler) handleProxyRequest(w http.ResponseWriter, r *http.Request) {
-	h.logger.Debug("gemini request get's hit")
+
+	// extracting the model name from the request before calling the serverHttp
+
+	// extracting from url
+	path := chi.URLParam(r, "*")
+	modelName := strings.Split(path, ":")[0]
+
+	// injecting modelname to request context
+	ctx := context.WithValue(r.Context(), "modelName", modelName)
+	r = r.WithContext(ctx)
+
 	h.proxy.ServeHTTP(w, r)
 }
 
@@ -69,10 +80,10 @@ func (h *Handler) TargetURL() string {
 
 // injecting api key into outgoing request headers
 func (h *Handler) InjectAPI(pr *httputil.ProxyRequest) error {
-
 	// for testing -> fetching key from env
 	// once the middleware implemented will get the real key from request context
-	realKey := h.cfg.Gemini.APIKey
+	realKey, _ := middleware.GetProviderKey(pr.In.Context())
+
 	q := pr.Out.URL.Query()
 	q.Del("key")
 
@@ -87,18 +98,16 @@ func (h *Handler) UpdateSpend(ctx context.Context, inputToken, outputToken int) 
 	var projectID string
 
 	modelName := ctx.Value("modelName")
-	project_id := ctx.Value("projectID")
+	project_id, ok := middleware.GetProjectID(ctx)
+
+	if ok {
+		projectID = project_id
+	}
 
 	if modelNameStr, ok := modelName.(string); ok {
 		model = modelNameStr
 	} else {
 		model = "gemini-3.5-flash"
-	}
-
-	if projectIDStr, ok := project_id.(string); ok {
-		projectID = projectIDStr
-	} else {
-		projectID = "test:123"
 	}
 
 	totalCost := billing.CalculateCost(model, inputToken, outputToken)

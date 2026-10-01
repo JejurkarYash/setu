@@ -7,7 +7,54 @@ package dbgen
 
 import (
 	"context"
+
+	"github.com/jackc/pgx/v5/pgtype"
 )
+
+const createApiKey = `-- name: CreateApiKey :one
+INSERT INTO api_key (project_id, key_prefix, key_hash, expires_at)
+VALUES ($1, $2, $3, $4)
+RETURNING id, project_id, key_prefix, key_hash, is_active, expires_at, last_used_at, created_at, updated_at
+`
+
+type CreateApiKeyParams struct {
+	ProjectID string
+	KeyPrefix string
+	KeyHash   string
+	ExpiresAt pgtype.Timestamptz
+}
+
+func (q *Queries) CreateApiKey(ctx context.Context, arg CreateApiKeyParams) (ApiKey, error) {
+	row := q.db.QueryRow(ctx, createApiKey,
+		arg.ProjectID,
+		arg.KeyPrefix,
+		arg.KeyHash,
+		arg.ExpiresAt,
+	)
+	var i ApiKey
+	err := row.Scan(
+		&i.ID,
+		&i.ProjectID,
+		&i.KeyPrefix,
+		&i.KeyHash,
+		&i.IsActive,
+		&i.ExpiresAt,
+		&i.LastUsedAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const deleteApiKey = `-- name: DeleteApiKey :exec
+DELETE FROM api_key
+WHERE id = $1
+`
+
+func (q *Queries) DeleteApiKey(ctx context.Context, id string) error {
+	_, err := q.db.Exec(ctx, deleteApiKey, id)
+	return err
+}
 
 const getActiveKeyMetadata = `-- name: GetActiveKeyMetadata :one
 SELECT 
@@ -40,4 +87,80 @@ func (q *Queries) GetProjectIDFromKeyHash(ctx context.Context, keyHash string) (
 	var project_id string
 	err := row.Scan(&project_id)
 	return project_id, err
+}
+
+const listApiKeysByProjectID = `-- name: ListApiKeysByProjectID :many
+SELECT id, project_id, key_prefix, key_hash, is_active, expires_at, last_used_at, created_at, updated_at FROM api_key
+WHERE project_id = $1
+ORDER BY created_at DESC
+`
+
+func (q *Queries) ListApiKeysByProjectID(ctx context.Context, projectID string) ([]ApiKey, error) {
+	rows, err := q.db.Query(ctx, listApiKeysByProjectID, projectID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ApiKey
+	for rows.Next() {
+		var i ApiKey
+		if err := rows.Scan(
+			&i.ID,
+			&i.ProjectID,
+			&i.KeyPrefix,
+			&i.KeyHash,
+			&i.IsActive,
+			&i.ExpiresAt,
+			&i.LastUsedAt,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const updateApiKeyLastUsed = `-- name: UpdateApiKeyLastUsed :exec
+UPDATE api_key
+SET last_used_at = NOW()
+WHERE id = $1
+`
+
+func (q *Queries) UpdateApiKeyLastUsed(ctx context.Context, id string) error {
+	_, err := q.db.Exec(ctx, updateApiKeyLastUsed, id)
+	return err
+}
+
+const updateApiKeyStatus = `-- name: UpdateApiKeyStatus :one
+UPDATE api_key
+SET is_active = $2, updated_at = NOW()
+WHERE id = $1
+RETURNING id, project_id, key_prefix, key_hash, is_active, expires_at, last_used_at, created_at, updated_at
+`
+
+type UpdateApiKeyStatusParams struct {
+	ID       string
+	IsActive bool
+}
+
+func (q *Queries) UpdateApiKeyStatus(ctx context.Context, arg UpdateApiKeyStatusParams) (ApiKey, error) {
+	row := q.db.QueryRow(ctx, updateApiKeyStatus, arg.ID, arg.IsActive)
+	var i ApiKey
+	err := row.Scan(
+		&i.ID,
+		&i.ProjectID,
+		&i.KeyPrefix,
+		&i.KeyHash,
+		&i.IsActive,
+		&i.ExpiresAt,
+		&i.LastUsedAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
 }

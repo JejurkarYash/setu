@@ -41,6 +41,7 @@ type ModelRate struct {
 type Project struct {
 	ID            string
 	Name          string
+	UserID        string
 	MonthlyBudget float64
 	CreatedAt     pgtype.Timestamptz
 	UpdatedAt     pgtype.Timestamptz

@@ -7,7 +7,58 @@ package dbgen
 
 import (
 	"context"
+
+	"github.com/jackc/pgx/v5/pgtype"
 )
+
+const createProviderKey = `-- name: CreateProviderKey :one
+INSERT INTO provider_keys (project_id, provider, encrypted_key, nonce)
+VALUES ($1, $2, $3, $4)
+ON CONFLICT (project_id, provider) 
+DO UPDATE SET 
+    encrypted_key = EXCLUDED.encrypted_key,
+    nonce = EXCLUDED.nonce,
+    updated_at = NOW()
+RETURNING id, project_id, provider, encrypted_key, nonce, is_active, created_at, updated_at
+`
+
+type CreateProviderKeyParams struct {
+	ProjectID    string
+	Provider     string
+	EncryptedKey []byte
+	Nonce        []byte
+}
+
+func (q *Queries) CreateProviderKey(ctx context.Context, arg CreateProviderKeyParams) (ProviderKey, error) {
+	row := q.db.QueryRow(ctx, createProviderKey,
+		arg.ProjectID,
+		arg.Provider,
+		arg.EncryptedKey,
+		arg.Nonce,
+	)
+	var i ProviderKey
+	err := row.Scan(
+		&i.ID,
+		&i.ProjectID,
+		&i.Provider,
+		&i.EncryptedKey,
+		&i.Nonce,
+		&i.IsActive,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const deleteProviderKey = `-- name: DeleteProviderKey :exec
+DELETE FROM provider_keys
+WHERE id = $1
+`
+
+func (q *Queries) DeleteProviderKey(ctx context.Context, id string) error {
+	_, err := q.db.Exec(ctx, deleteProviderKey, id)
+	return err
+}
 
 const getProviderKey = `-- name: GetProviderKey :one
 SELECT encrypted_key, nonce 
@@ -29,5 +80,73 @@ func (q *Queries) GetProviderKey(ctx context.Context, arg GetProviderKeyParams) 
 	row := q.db.QueryRow(ctx, getProviderKey, arg.ProjectID, arg.Provider)
 	var i GetProviderKeyRow
 	err := row.Scan(&i.EncryptedKey, &i.Nonce)
+	return i, err
+}
+
+const listProviderKeysByProjectID = `-- name: ListProviderKeysByProjectID :many
+SELECT id, provider, is_active, created_at, updated_at 
+FROM provider_keys
+WHERE project_id = $1
+`
+
+type ListProviderKeysByProjectIDRow struct {
+	ID        string
+	Provider  string
+	IsActive  bool
+	CreatedAt pgtype.Timestamptz
+	UpdatedAt pgtype.Timestamptz
+}
+
+func (q *Queries) ListProviderKeysByProjectID(ctx context.Context, projectID string) ([]ListProviderKeysByProjectIDRow, error) {
+	rows, err := q.db.Query(ctx, listProviderKeysByProjectID, projectID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListProviderKeysByProjectIDRow
+	for rows.Next() {
+		var i ListProviderKeysByProjectIDRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Provider,
+			&i.IsActive,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const updateProviderKeyStatus = `-- name: UpdateProviderKeyStatus :one
+UPDATE provider_keys
+SET is_active = $2, updated_at = NOW()
+WHERE id = $1
+RETURNING id, project_id, provider, encrypted_key, nonce, is_active, created_at, updated_at
+`
+
+type UpdateProviderKeyStatusParams struct {
+	ID       string
+	IsActive bool
+}
+
+func (q *Queries) UpdateProviderKeyStatus(ctx context.Context, arg UpdateProviderKeyStatusParams) (ProviderKey, error) {
+	row := q.db.QueryRow(ctx, updateProviderKeyStatus, arg.ID, arg.IsActive)
+	var i ProviderKey
+	err := row.Scan(
+		&i.ID,
+		&i.ProjectID,
+		&i.Provider,
+		&i.EncryptedKey,
+		&i.Nonce,
+		&i.IsActive,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
 	return i, err
 }

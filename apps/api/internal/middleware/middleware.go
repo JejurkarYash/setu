@@ -30,6 +30,18 @@ const (
 	providerAPIKey contextKey = "provider_key"
 )
 
+// getter functions -> for extracting apikey and project from reuqest context
+
+func GetProviderKey(ctx context.Context) (string, bool) {
+	val, ok := ctx.Value(providerAPIKey).(string)
+	return val, ok
+}
+
+func GetProjectID(ctx context.Context) (string, bool) {
+	val, ok := ctx.Value(projectIDKey).(string)
+	return val, ok
+}
+
 // constructor function
 func NewMiddleware(db *database.Database, rdb *redis.Client, logger *slog.Logger, encryptor *utils.Encryptor) *Middleware {
 
@@ -65,15 +77,12 @@ func (m *Middleware) Authenticate(next http.Handler) http.Handler {
 		case "openai":
 			auth := r.Header.Get("Authorization")
 			rawKey = strings.TrimPrefix(auth, "Bearer ")
-			fmt.Println("openaikey:", rawKey)
 
 		case "gemini":
 			rawKey = r.Header.Get("x-goog-api-key")
-			fmt.Println("geminkey:", rawKey)
 
 		case "anthropic":
 			rawKey = r.Header.Get("x-api-key")
-			fmt.Println("anthropickey:", rawKey)
 		}
 
 		// hash it and check the database
@@ -86,11 +95,13 @@ func (m *Middleware) Authenticate(next http.Handler) http.Handler {
 		// look in redis
 		metadata, err := m.rdb.GetKeyMetadata(r.Context(), hashedKey)
 		if err != nil {
-			m.logger.Error("failed to fetch key metadata from redis", slog.Any("err", err))
+			m.logger.Debug("metadat is not present in redis")
 		}
 
 		// authenticated
 		if metadata != nil {
+
+			fmt.Println("metadata:", metadata)
 
 			// setting projectID & budgetLimit
 			projectID = metadata.ProjectID
@@ -113,6 +124,8 @@ func (m *Middleware) Authenticate(next http.Handler) http.Handler {
 				return
 			}
 
+			fmt.Println("dbMeta", dbMeta)
+
 			// setting projectID & budgetLimit
 			projectID = dbMeta.ProjectID
 			budgetLimit = dbMeta.BudgetLimit
@@ -123,7 +136,7 @@ func (m *Middleware) Authenticate(next http.Handler) http.Handler {
 				Provider:  provider,
 			})
 
-			// decrypyting key
+			// decrypyting llm api key
 			decryptedKey, err := m.encryptor.Decrypt(keyRecord.EncryptedKey, keyRecord.Nonce)
 			if err != nil {
 				m.logger.Error("failed to decrypyt key", slog.Any("err", err))
@@ -145,6 +158,8 @@ func (m *Middleware) Authenticate(next http.Handler) http.Handler {
 			// injecting projectID into request context
 			ctx := r.Context()
 			ctx = context.WithValue(ctx, projectIDKey, cacheMeta.ProjectID)
+			ctx = context.WithValue(ctx, providerAPIKey, cacheMeta.ProviderAPIKey)
+
 			r = r.WithContext(ctx)
 		}
 
@@ -153,6 +168,8 @@ func (m *Middleware) Authenticate(next http.Handler) http.Handler {
 		if err != nil {
 			m.logger.Error("failed to check budget", slog.Any("err", err))
 		}
+
+		fmt.Println("cost:", cost)
 
 		if cost > budgetLimit {
 			//  block the request

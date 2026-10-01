@@ -2,6 +2,7 @@ package openai
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"encoding/json"
 	"io"
@@ -12,6 +13,7 @@ import (
 
 	"github.com/JejurkarYash/setu/internal/billing"
 	"github.com/JejurkarYash/setu/internal/config"
+	"github.com/JejurkarYash/setu/internal/middleware"
 	"github.com/JejurkarYash/setu/internal/proxy"
 	"github.com/JejurkarYash/setu/internal/redis"
 	"github.com/go-chi/chi"
@@ -22,6 +24,10 @@ type Handler struct {
 	logger *slog.Logger
 	proxy  *httputil.ReverseProxy
 	rdb    *redis.Client
+}
+
+type OpenAIModelName struct {
+	Model string
 }
 
 type OpenAIStreamResponse struct {
@@ -64,22 +70,38 @@ func (h *Handler) Routes() chi.Router {
 }
 
 func (h *Handler) handleProxyRequest(w http.ResponseWriter, r *http.Request) {
-	h.logger.Debug("open ai route hit")
-	// serving the request
+
+	// extracting modelname and injecting it in request context
+
+	//  Read the bytes into memory
+	bodyBytes, _ := io.ReadAll(r.Body)
+
+	// put the bytes back into request body
+	r.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
+
+	// read the model name from read bytes of memory
+	var modelName OpenAIModelName
+	_ = json.Unmarshal(bodyBytes, &modelName)
+
+	// setting modelName into ctx (as string)
+	ctx := context.WithValue(r.Context(), "modelName", modelName.Model)
+	r = r.WithContext(ctx)
+
 	h.proxy.ServeHTTP(w, r)
 }
 
 // interface methods
 func (h *Handler) TargetURL() string {
-	return "http://localhost:8081"
+	return "http://localhost:8081" // replace this url with openai
 }
 
 func (h *Handler) InjectAPI(pr *httputil.ProxyRequest) error {
 	var key string
 	// attaching the OPENAI_API_KEY
-	originalKey := pr.In.Context().Value("api_key") // -> extract it from context
-	if keyStr, ok := originalKey.(string); ok {
-		key = keyStr
+	originalKey, ok := middleware.GetProviderKey(pr.In.Context())
+
+	if ok {
+		key = originalKey
 	}
 
 	pr.Out.Header.Set("Authorization", "Bearer "+key)
@@ -92,7 +114,7 @@ func (h *Handler) UpdateSpend(ctx context.Context, inputToken, outputToken int) 
 	var projectID string
 
 	modelName := ctx.Value("modelName")
-	project_id := ctx.Value("projectID")
+	project_id, ok := middleware.GetProjectID(ctx)
 
 	if modelNameStr, ok := modelName.(string); ok {
 		model = modelNameStr
@@ -100,8 +122,8 @@ func (h *Handler) UpdateSpend(ctx context.Context, inputToken, outputToken int) 
 		model = "gpt-5.5"
 	}
 
-	if projectIDStr, ok := project_id.(string); ok {
-		projectID = projectIDStr
+	if ok {
+		projectID = project_id
 	} else { // --> else block of for only testing purpose need to replace it later
 		projectID = "test:ABC"
 	}
