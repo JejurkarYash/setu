@@ -182,5 +182,59 @@ func main() {
 	fmt.Println("2. Low Budget Project ($0.0008 budget):")
 	fmt.Printf("   Key: %s\n", lowBudgetRawKey)
 	fmt.Println("   Budget: $0.0008 (Blocks on 3rd request!)")
+	fmt.Println("------------------------------------------")
+
+	// 6. Anthropic Test Project
+	anthropicProject, err := db.Queries.CreateProject(context.Background(), dbgen.CreateProjectParams{
+		Name:          "Anthropic Test Project",
+		UserID:        user.ID,
+		MonthlyBudget: 100.0,
+	})
+	if err != nil {
+		log.Fatal("failed to create Anthropic PROJECT: ", err)
+		os.Exit(1)
+	}
+	fmt.Println("\nAnthropic Project Created Successfully:", anthropicProject.ID)
+
+	// Anthropic API Key (Setu key - what the user will send in curl)
+	anthropicRawKey := "setu_test_key_anthropic"
+	anthropicHash := sha256.Sum256([]byte(anthropicRawKey))
+	anthropicHashedKey := hex.EncodeToString(anthropicHash[:])
+
+	anthropicApiKey, err := db.Queries.CreateApiKey(context.Background(), dbgen.CreateApiKeyParams{
+		ProjectID: anthropicProject.ID,
+		KeyPrefix: "setu_live_ant",
+		KeyHash:   anthropicHashedKey,
+		ExpiresAt: pgtype.Timestamptz{Valid: false},
+	})
+	if err != nil {
+		log.Fatal("failed to create Anthropic API KEY: ", err)
+		os.Exit(1)
+	}
+	fmt.Println("Anthropic API Key Created:", anthropicApiKey.KeyPrefix)
+
+	// Encrypt and store the real Anthropic provider key
+	encryptedAnthropicKey, nonceAnthropic, err := encryptor.Encrypt("mock-anthropic-provider-key")
+	if err != nil {
+		log.Fatal("failed to encrypt Anthropic key: ", err)
+		os.Exit(1)
+	}
+
+	_, err = db.Queries.CreateProviderKey(context.Background(), dbgen.CreateProviderKeyParams{
+		ProjectID:    anthropicProject.ID,
+		Provider:     "anthropic",
+		EncryptedKey: encryptedAnthropicKey,
+		Nonce:        nonceAnthropic,
+	})
+	if err != nil {
+		log.Fatal("failed to create Anthropic providerKey: ", err)
+		os.Exit(1)
+	}
+	fmt.Println("Anthropic ProviderKey Created Successfully!")
+
+	fmt.Println("------------------------------------------")
+	fmt.Println("3. Anthropic Test Project ($100 budget):")
+	fmt.Printf("   Key: %s\n", anthropicRawKey)
+	fmt.Println("   Provider Key: mock-anthropic-provider-key")
 	fmt.Println("==========================================")
 }

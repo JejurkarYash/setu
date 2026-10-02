@@ -113,7 +113,7 @@ func (m *Middleware) Authenticate(next http.Handler) http.Handler {
 			ctx = context.WithValue(ctx, providerAPIKey, metadata.ProviderAPIKey) // writing llm key into request context
 			r = r.WithContext(ctx)
 
-		} else { // unauthenticated
+		} else { // unauthenticated --> look into DB 
 
 			// fetch from db
 			dbMeta, err := m.db.Queries.GetActiveKeyMetadata(r.Context(), hashedKey)

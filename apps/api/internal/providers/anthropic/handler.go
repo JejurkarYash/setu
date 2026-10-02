@@ -2,6 +2,7 @@ package anthropic
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"encoding/json"
 	"io"
@@ -12,6 +13,7 @@ import (
 
 	"github.com/JejurkarYash/setu/internal/billing"
 	"github.com/JejurkarYash/setu/internal/config"
+	"github.com/JejurkarYash/setu/internal/middleware"
 	"github.com/JejurkarYash/setu/internal/proxy"
 	"github.com/JejurkarYash/setu/internal/redis"
 	"github.com/go-chi/chi"
@@ -22,6 +24,10 @@ type Handler struct {
 	logger *slog.Logger
 	proxy  *httputil.ReverseProxy
 	rdb    *redis.Client
+}
+
+type AnthropicModelName struct {
+	Model string
 }
 
 // non Streaming
@@ -58,13 +64,27 @@ func NewHandler(cfg *config.Config, logger *slog.Logger, rdb *redis.Client) *Han
 
 func (h *Handler) Routes() chi.Router {
 	r := chi.NewRouter()
-	r.Post("/v1/{path...}", h.handleProxyRequest)
+	r.Post("/v1/*", h.handleProxyRequest)
 
 	return r
 }
 
 func (h *Handler) handleProxyRequest(w http.ResponseWriter, r *http.Request) {
 	h.logger.Debug("Anthropic Request hit")
+	// getting the model name from request body
+	// reading all bytes from request body
+	bodyBytes, _ := io.ReadAll(r.Body)
+
+	// setting request body again
+	r.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
+
+	var model AnthropicModelName
+	_ = json.Unmarshal(bodyBytes, &model)
+
+	// setting modelname into context (as string)
+	ctx := context.WithValue(r.Context(), "modelName", model.Model)
+	r = r.WithContext(ctx)
+
 	h.proxy.ServeHTTP(w, r)
 }
 
@@ -73,6 +93,18 @@ func (h *Handler) TargetURL() string {
 }
 
 func (h *Handler) InjectAPI(pr *httputil.ProxyRequest) error {
+	var key string
+
+	// getting provider key from middleware or request context
+	originalKey, ok := middleware.GetProviderKey(pr.In.Context())
+
+	if ok {
+		key = originalKey
+	}
+
+	// injecting it into outgoing request
+	pr.Out.Header.Set("Authorization", key)
+	pr.Out.Header.Set("x-api-key", key)
 
 	return nil
 }
@@ -83,18 +115,16 @@ func (h *Handler) UpdateSpend(ctx context.Context, inputToken, outputToken int) 
 	var projectID string
 
 	modelName := ctx.Value("modelName")
-	project_id := ctx.Value("projectID")
+	project_id, ok := middleware.GetProjectID(ctx)
+
+	if ok {
+		projectID = project_id
+	}
 
 	if modelNameStr, ok := modelName.(string); ok {
 		model = modelNameStr
 	} else { // --> else block of for only testing purpose need to replace it later
 		model = "claude-fable-5"
-	}
-
-	if projectIDStr, ok := project_id.(string); ok {
-		projectID = projectIDStr
-	} else { // --> else block of for only testing purpose need to replace it later
-		projectID = "test:XYZ"
 	}
 
 	totalCost := billing.CalculateCost(model, inputToken, outputToken)

@@ -49,7 +49,7 @@ func NewProxyEngine(p Provider, logger *slog.Logger) *Engine {
 func (e *Engine) SetupProxyEngine() *httputil.ReverseProxy {
 	return &httputil.ReverseProxy{
 		FlushInterval: -1,
-		Rewrite: func(pr *httputil.ProxyRequest) {
+		Rewrite: func(pr *httputil.ProxyRequest) { // -> rewriting the outgoing request
 
 			target, _ := url.Parse(e.provider.TargetURL())
 			pr.SetURL(target)
@@ -57,13 +57,13 @@ func (e *Engine) SetupProxyEngine() *httputil.ReverseProxy {
 
 			// disabling the compressed
 			pr.Out.Header.Set("Accept-Encoding", "identity")
-			// injecting api
+			// injecting provider api key
 			e.provider.InjectAPI(pr)
 		},
 
-		ModifyResponse: func(r *http.Response) error {
-			// reading logic comes here
+		ModifyResponse: func(r *http.Response) error { // -> modifying the incoming LLM response
 
+			// reading logic comes here
 			pr, pw := io.Pipe()
 
 			r.Body = &bodyWrapper{
