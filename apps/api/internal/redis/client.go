@@ -19,6 +19,7 @@ type KeyMetadata struct {
 	ProviderAPIKey string  `json:"provider_key"`
 }
 
+// constructor function
 func NewClient(addr string) (*Client, error) {
 
 	fmt.Println("Addr:", addr)
@@ -38,13 +39,15 @@ func NewClient(addr string) (*Client, error) {
 
 // method to increment the spend
 func (c *Client) IncrSpend(ctx context.Context, model, projectID string, amount float64) error {
-	key := "project:" + projectID + ":spend"
+	currentMonth := time.Now().UTC().Format("2006-01")
+	key := fmt.Sprintf("project:%s:spend:%s", projectID, currentMonth)
 	return c.rdb.IncrByFloat(ctx, key, amount).Err()
 }
 
 // method to check the budget
 func (c *Client) GetSpend(ctx context.Context, projectID string) (float64, error) {
-	key := "project:" + projectID + ":spend"
+	currentMonth := time.Now().UTC().Format("2006-01")
+	key := fmt.Sprintf("project:%s:spend:%s", projectID, currentMonth)
 	val, err := c.rdb.Get(ctx, key).Float64()
 	if err == redis.Nil {
 		return 0.0, nil

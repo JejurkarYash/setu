@@ -34,7 +34,7 @@ type GeminiResponse struct {
 	}
 }
 
-// gemini handler init
+// gemini handler init ( constructor function )
 func NewHandler(cfg *config.Config, logger *slog.Logger, rdb *redis.Client) *Handler {
 	h := &Handler{
 		cfg:    cfg,
@@ -57,11 +57,10 @@ func (h *Handler) Routes() chi.Router {
 	return r
 }
 
-// handling the proxy
+// handling the proxy ( core proxy request )
 func (h *Handler) handleProxyRequest(w http.ResponseWriter, r *http.Request) {
 
 	// extracting the model name from the request before calling the serverHttp
-
 	// extracting from url
 	path := chi.URLParam(r, "*")
 	modelName := strings.Split(path, ":")[0]
@@ -110,6 +109,7 @@ func (h *Handler) UpdateSpend(ctx context.Context, inputToken, outputToken int) 
 		model = "gemini-3.5-flash"
 	}
 
+	// getting cost of per request 
 	totalCost := billing.CalculateCost(model, inputToken, outputToken)
 
 	// logging for debug
