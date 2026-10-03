@@ -7,6 +7,10 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+
+	"github.com/JejurkarYash/setu/internal/database"
+	"github.com/JejurkarYash/setu/internal/database/dbgen"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 // provider interface
@@ -15,7 +19,7 @@ type Provider interface {
 	InjectAPI(pr *httputil.ProxyRequest) error                // -> injecting the API
 	Parser(r io.Reader, contentType string) (int, int, error) // -> reading the input and output tokens
 
-	UpdateSpend(ctx context.Context, inputToken, outputToken int) error // -> update the redis counter
+	UpdateSpend(ctx context.Context, inputToken, outputToken int) (string, string, float64, error) // -> update the redis counter
 }
 
 type bodyWrapper struct {
@@ -35,13 +39,15 @@ func (b *bodyWrapper) Close() error {
 type Engine struct {
 	provider Provider
 	Logger   *slog.Logger
+	db       *database.Database
 }
 
 // proxy init
-func NewProxyEngine(p Provider, logger *slog.Logger) *Engine {
+func NewProxyEngine(p Provider, logger *slog.Logger, db *database.Database) *Engine {
 	return &Engine{
 		provider: p,
 		Logger:   logger,
+		db:       db,
 	}
 }
 
@@ -79,7 +85,7 @@ func (e *Engine) SetupProxyEngine() *httputil.ReverseProxy {
 			// it cancel the main reuqqest context
 			detachedCtx := context.WithoutCancel(r.Request.Context())
 
-			// run in the background
+			// run in the background -> spawning a thread
 			go func() {
 
 				inputToken, outputToken, err := e.provider.Parser(pr, contentType) // -> llm specific provider
@@ -88,7 +94,27 @@ func (e *Engine) SetupProxyEngine() *httputil.ReverseProxy {
 				}
 
 				// passing this token to calculate or update the redis part
-				e.provider.UpdateSpend(detachedCtx, inputToken, outputToken)
+				projectId, modelName, totalCost, error := e.provider.UpdateSpend(detachedCtx, inputToken, outputToken)
+
+				if error != nil {
+					e.Logger.Error("failed to get the data from update spend", slog.Any("err", error))
+				}
+
+				// database log -> for analytics purpose
+				var projectUUID pgtype.UUID
+				if err := projectUUID.Scan(projectId); err != nil {
+					e.Logger.Error("failed to parse projectID as UUID", slog.Any("error", err))
+				}
+
+				e.db.Queries.InsertUsageLog(detachedCtx, dbgen.InsertUsageLogParams{
+					ProjectID:        projectUUID,
+					Model:            modelName,
+					PromptTokens:     int32(inputToken),
+					CompletionTokens: int32(outputToken),
+					StatusCode:       200,
+					CostUsd:          float64(totalCost),
+				})
+
 			}()
 			return nil
 		},

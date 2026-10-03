@@ -14,6 +14,7 @@ import (
 	"github.com/JejurkarYash/setu/internal/database/dbgen"
 	"github.com/JejurkarYash/setu/internal/lib/utils"
 	"github.com/JejurkarYash/setu/internal/redis"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 type Middleware struct {
@@ -113,7 +114,7 @@ func (m *Middleware) Authenticate(next http.Handler) http.Handler {
 			ctx = context.WithValue(ctx, providerAPIKey, metadata.ProviderAPIKey) // writing llm key into request context
 			r = r.WithContext(ctx)
 
-		} else { // unauthenticated --> look into DB 
+		} else { // unauthenticated --> look into DB
 
 			// fetch from db
 			dbMeta, err := m.db.Queries.GetActiveKeyMetadata(r.Context(), hashedKey)
@@ -175,8 +176,29 @@ func (m *Middleware) Authenticate(next http.Handler) http.Handler {
 			//  block the request
 
 			// logging
-			m.logger.Info("request is block", slog.String("projectID", projectID), slog.Float64("budget", budgetLimit), slog.Float64("cost", cost))
+			m.logger.Info("request is block", slog.String("projectID", projectID),
+				slog.Float64("budget", budgetLimit), slog.Float64("cost", cost))
 
+			// Database logging
+			var projectUUID pgtype.UUID
+			if err := projectUUID.Scan(projectID); err != nil {
+				m.logger.Error("failed to parse projectId as UUID", slog.Any("error", err))
+			}
+
+			_, err := m.db.Queries.InsertUsageLog(r.Context(), dbgen.InsertUsageLogParams{
+				ProjectID:        projectUUID,
+				Model:            "blocked",
+				CompletionTokens: 0,
+				PromptTokens:     0,
+				CostUsd:          0,
+				StatusCode:       429,
+			})
+
+			if err != nil {
+				m.logger.Error("failed to insert usageLog", slog.Any("error", err))
+			}
+
+			// returning response (Blocked)
 			w.WriteHeader(http.StatusTooManyRequests)
 			w.Write([]byte("Quota Exceeded:Too Many Requests"))
 			return

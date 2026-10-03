@@ -1,4 +1,4 @@
--- name: CreateApiKey :one
+-- name: CreateApiKey :one 
 INSERT INTO api_key (project_id, key_prefix, key_hash, expires_at)
 VALUES ($1, $2, $3, $4)
 RETURNING *;

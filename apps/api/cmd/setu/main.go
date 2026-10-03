@@ -80,14 +80,14 @@ func main() {
 	}
 
 	// Handlers init
-	geminiHandler := gemini.NewHandler(config, appLogger, rdb)
-	openAIHandler := openai.NewHandler(config, appLogger, rdb)
-	anthropicHandler := anthropic.NewHandler(config, appLogger, rdb)
+	geminiHandler := gemini.NewHandler(config, appLogger, rdb, db)
+	openAIHandler := openai.NewHandler(config, appLogger, rdb, db)
+	anthropicHandler := anthropic.NewHandler(config, appLogger, rdb, db)
 
 	// creating new encrytor
-	encryptor, _ := utils.NewEncryptor(config.Encryption.MasterKey); 
+	encryptor, _ := utils.NewEncryptor(config.Encryption.MasterKey)
 	// middleware init
-	middleware := middleware.NewMiddleware(db, rdb, appLogger,encryptor)
+	middleware := middleware.NewMiddleware(db, rdb, appLogger, encryptor)
 	// passing LLM provider's handlers to router to register routes
 	router := router.NewRouter(geminiHandler, openAIHandler, anthropicHandler, *middleware)
 
@@ -115,7 +115,7 @@ func main() {
 
 	}
 	stop()
-	cancel() 
+	cancel()
 
 	appLogger.Info("server exited properly")
 

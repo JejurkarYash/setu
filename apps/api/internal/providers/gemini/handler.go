@@ -12,6 +12,7 @@ import (
 
 	"github.com/JejurkarYash/setu/internal/billing"
 	"github.com/JejurkarYash/setu/internal/config"
+	"github.com/JejurkarYash/setu/internal/database"
 	"github.com/JejurkarYash/setu/internal/middleware"
 	"github.com/JejurkarYash/setu/internal/proxy"
 	"github.com/JejurkarYash/setu/internal/redis"
@@ -35,7 +36,7 @@ type GeminiResponse struct {
 }
 
 // gemini handler init ( constructor function )
-func NewHandler(cfg *config.Config, logger *slog.Logger, rdb *redis.Client) *Handler {
+func NewHandler(cfg *config.Config, logger *slog.Logger, rdb *redis.Client, db *database.Database) *Handler {
 	h := &Handler{
 		cfg:    cfg,
 		logger: logger,
@@ -43,7 +44,7 @@ func NewHandler(cfg *config.Config, logger *slog.Logger, rdb *redis.Client) *Han
 	}
 
 	// getting the newproxy engine
-	p := proxy.NewProxyEngine(h, logger)
+	p := proxy.NewProxyEngine(h, logger, db) //
 	h.proxy = p.SetupProxyEngine()
 
 	return h
@@ -92,7 +93,7 @@ func (h *Handler) InjectAPI(pr *httputil.ProxyRequest) error {
 }
 
 // update the redis counter
-func (h *Handler) UpdateSpend(ctx context.Context, inputToken, outputToken int) error {
+func (h *Handler) UpdateSpend(ctx context.Context, inputToken, outputToken int) (string, string, float64, error) {
 	var model string
 	var projectID string
 
@@ -109,7 +110,7 @@ func (h *Handler) UpdateSpend(ctx context.Context, inputToken, outputToken int) 
 		model = "gemini-3.5-flash"
 	}
 
-	// getting cost of per request 
+	// getting cost of per request
 	totalCost := billing.CalculateCost(model, inputToken, outputToken)
 
 	// logging for debug
@@ -119,12 +120,14 @@ func (h *Handler) UpdateSpend(ctx context.Context, inputToken, outputToken int) 
 		slog.Int("input_tokens", inputToken),
 		slog.Int("output_tokens", outputToken))
 
+	// log the request into db for analytics
+
 	if err := h.rdb.IncrSpend(ctx, model, projectID, totalCost); err != nil {
 		h.logger.Error("failed to update redis spend", slog.Any("err", err))
-		return err
+		return "", "", 0.0, err
 	}
 
-	return nil
+	return projectID, model, totalCost, nil
 }
 
 // parsing

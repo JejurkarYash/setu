@@ -13,6 +13,7 @@ import (
 
 	"github.com/JejurkarYash/setu/internal/billing"
 	"github.com/JejurkarYash/setu/internal/config"
+	"github.com/JejurkarYash/setu/internal/database"
 	"github.com/JejurkarYash/setu/internal/middleware"
 	"github.com/JejurkarYash/setu/internal/proxy"
 	"github.com/JejurkarYash/setu/internal/redis"
@@ -49,14 +50,14 @@ type OpenAIJSONResponse struct {
 }
 
 // openai handler init
-func NewHandler(cfg *config.Config, logger *slog.Logger, rdb *redis.Client) *Handler {
+func NewHandler(cfg *config.Config, logger *slog.Logger, rdb *redis.Client, db *database.Database) *Handler {
 	h := &Handler{
 		cfg:    cfg,
 		logger: logger,
 		rdb:    rdb,
 	}
 
-	proxy := proxy.NewProxyEngine(h, logger)
+	proxy := proxy.NewProxyEngine(h, logger, db)
 	h.proxy = proxy.SetupProxyEngine()
 
 	return h
@@ -109,7 +110,7 @@ func (h *Handler) InjectAPI(pr *httputil.ProxyRequest) error {
 }
 
 // update redis spend
-func (h *Handler) UpdateSpend(ctx context.Context, inputToken, outputToken int) error {
+func (h *Handler) UpdateSpend(ctx context.Context, inputToken, outputToken int) (string, string, float64, error) {
 	var model string
 	var projectID string
 
@@ -139,10 +140,10 @@ func (h *Handler) UpdateSpend(ctx context.Context, inputToken, outputToken int) 
 
 	if err := h.rdb.IncrSpend(ctx, model, projectID, totalCost); err != nil {
 		h.logger.Error("failed to update redis spend", slog.Any("err", err))
-		return err
+		return "", "", 0.0, err
 	}
 
-	return nil
+	return projectID, model, totalCost, nil
 }
 
 // parsing the response based on response content type
