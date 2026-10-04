@@ -17,12 +17,14 @@ import (
 	"github.com/JejurkarYash/setu/internal/lib/utils"
 	"github.com/JejurkarYash/setu/internal/logger"
 	"github.com/JejurkarYash/setu/internal/middleware"
+	"github.com/JejurkarYash/setu/internal/project"
 	"github.com/JejurkarYash/setu/internal/providers/anthropic"
 	"github.com/JejurkarYash/setu/internal/providers/gemini"
 	"github.com/JejurkarYash/setu/internal/providers/openai"
 	"github.com/JejurkarYash/setu/internal/redis"
 	"github.com/JejurkarYash/setu/internal/router"
 	"github.com/JejurkarYash/setu/internal/server"
+	"github.com/JejurkarYash/setu/internal/users"
 )
 
 type GeminiStreamChunk struct {
@@ -79,17 +81,31 @@ func main() {
 		appLogger.Debug("redis is connected...")
 	}
 
-	// Handlers init
-	geminiHandler := gemini.NewHandler(config, appLogger, rdb, db)
-	openAIHandler := openai.NewHandler(config, appLogger, rdb, db)
-	anthropicHandler := anthropic.NewHandler(config, appLogger, rdb, db)
-
 	// creating new encrytor
 	encryptor, _ := utils.NewEncryptor(config.Encryption.MasterKey)
 	// middleware init
 	middleware := middleware.NewMiddleware(db, rdb, appLogger, encryptor)
-	// passing LLM provider's handlers to router to register routes
-	router := router.NewRouter(geminiHandler, openAIHandler, anthropicHandler, *middleware)
+
+	// LLM Provider Handlers
+	geminiHandler := gemini.NewHandler(config, appLogger, rdb, db)
+	openAIHandler := openai.NewHandler(config, appLogger, rdb, db)
+	anthropicHandler := anthropic.NewHandler(config, appLogger, rdb, db)
+
+	// NON-LLM Handlers
+	userHandler := users.NewHandler(db)
+	projectHandler := project.NewHandler(db)
+
+	// constructing router config ( dependencies )
+	routerConfig := router.RouterConfig{
+		Middleware:     *middleware,
+		GeminiHandler:  geminiHandler,
+		OpenAIHandler:  openAIHandler,
+		Anthropic:      anthropicHandler,
+		UserHandler:    userHandler,
+		ProjectHandler: projectHandler,
+	}
+
+	router := router.NewRouter(&routerConfig)
 
 	// server init
 	server, err := server.NewServer(config, router, appLogger, rdb, db)

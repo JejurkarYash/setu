@@ -4,17 +4,24 @@ import (
 	"net/http"
 
 	"github.com/JejurkarYash/setu/internal/middleware"
+	"github.com/JejurkarYash/setu/internal/project"
 	"github.com/JejurkarYash/setu/internal/providers/anthropic"
 	"github.com/JejurkarYash/setu/internal/providers/gemini"
 	"github.com/JejurkarYash/setu/internal/providers/openai"
+	"github.com/JejurkarYash/setu/internal/users"
 	"github.com/go-chi/chi"
 )
 
-type Router struct {
-	router *chi.Mux
+type RouterConfig struct {
+	Middleware     middleware.Middleware
+	GeminiHandler  *gemini.Handler
+	OpenAIHandler  *openai.Handler
+	Anthropic      *anthropic.Handler
+	UserHandler    *users.Handler
+	ProjectHandler *project.Handler
 }
 
-func NewRouter(geminiRouter *gemini.Handler, openAIRouter *openai.Handler, anthropicRouter *anthropic.Handler, mw middleware.Middleware) *chi.Mux {
+func NewRouter(cfg *RouterConfig) *chi.Mux {
 
 	r := chi.NewRouter()
 
@@ -25,19 +32,21 @@ func NewRouter(geminiRouter *gemini.Handler, openAIRouter *openai.Handler, anthr
 		w.Write([]byte("Server is running..."))
 	})
 
+	// Core Routes (LLM Routes)
 	r.Group(func(r chi.Router) {
-
 		// middleware
-		r.Use(mw.Authenticate)
+		r.Use(cfg.Middleware.Authenticate)
 
-	// mounting the gemini sub-routes
-	r.Mount("/v1beta", geminiRouter.Routes())
-	// mounting the openai sub-routes
-	r.Mount("/v1", openAIRouter.Routes())
-	// mounting the anthropic sub-routes
-	r.Mount("/anthropic", anthropicRouter.Routes())
+		// mounting the gemini sub-routes
+		r.Mount("/v1beta", cfg.GeminiHandler.Routes())
+		// mounting the openai sub-routes
+		r.Mount("/v1", cfg.OpenAIHandler.Routes())
+		// mounting the anthropic sub-routes
+		r.Mount("/anthropic", cfg.Anthropic.Routes())
 
 	})
+
+	// registering remaining routes
 
 	return r
 }
