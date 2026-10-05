@@ -29,9 +29,10 @@ type contextKey string
 const (
 	projectIDKey   contextKey = "project_id"
 	providerAPIKey contextKey = "provider_key"
+	userIDKey      contextKey = "user_id"
 )
 
-// getter functions -> for extracting apikey and project from reuqest context
+// helper functions -> for extracting apikey and project from reuqest context
 
 func GetProviderKey(ctx context.Context) (string, bool) {
 	val, ok := ctx.Value(providerAPIKey).(string)
@@ -40,6 +41,12 @@ func GetProviderKey(ctx context.Context) (string, bool) {
 
 func GetProjectID(ctx context.Context) (string, bool) {
 	val, ok := ctx.Value(projectIDKey).(string)
+	return val, ok
+}
+
+func GetUserID(ctx context.Context) (string, bool) {
+	val, ok := ctx.Value(userIDKey).(string)
+	fmt.Println("val:", val)
 	return val, ok
 }
 
@@ -55,7 +62,7 @@ func NewMiddleware(db *database.Database, rdb *redis.Client, logger *slog.Logger
 }
 
 // LLM Routes middlware
-func (m *Middleware) Authenticate(next http.Handler) http.Handler {
+func (m *Middleware) AuthenticateLLM(next http.Handler) http.Handler {
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
@@ -211,6 +218,36 @@ func (m *Middleware) Authenticate(next http.Handler) http.Handler {
 
 }
 
-// NON LLM Routes middleware 
-// func (m *Middleware)
+// NON LLM Routes middleware
+func (m *Middleware) AuthenticateJWT(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
+		authHeader := r.Header.Get("Authorization")
+		if authHeader == "" {
+			utils.WriteError(w, http.StatusUnauthorized, "Authorization header missing")
+			return
+		}
+
+		parts := strings.Split(authHeader, " ")
+		if len(parts) != 2 || parts[0] != "Bearer" {
+			utils.WriteError(w, http.StatusUnauthorized, "Invalid authorization format (expected 'Bearer' <token>')")
+			return
+		}
+
+		tokenString := parts[1]
+
+		// validate token
+		userID, err := utils.ValidateJWT(tokenString)
+		if err != nil {
+			utils.WriteError(w, http.StatusUnauthorized, err.Error())
+			return
+		}
+
+		// injecting userID into context
+		ctx := context.WithValue(r.Context(), userIDKey, userID)
+
+		// forwarding request to the handler
+		next.ServeHTTP(w, r.WithContext(ctx))
+
+	})
+}

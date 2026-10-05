@@ -10,6 +10,7 @@ import (
 	"github.com/JejurkarYash/setu/internal/database"
 	"github.com/JejurkarYash/setu/internal/database/dbgen"
 	"github.com/JejurkarYash/setu/internal/lib/utils"
+	"github.com/JejurkarYash/setu/internal/middleware"
 	"github.com/go-chi/chi"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -30,6 +31,10 @@ type AuthResponse struct {
 	User  *dbgen.User `json:"user"`
 }
 
+type GetUserResponse struct {
+	User dbgen.User `json:"user"`
+}
+
 func NewHandler(db *database.Database, logger *slog.Logger) *Handler {
 	return &Handler{
 		db:     db,
@@ -38,11 +43,20 @@ func NewHandler(db *database.Database, logger *slog.Logger) *Handler {
 }
 
 // registering users routes
-func (h *Handler) Routes() chi.Router {
+func (h *Handler) Routes(mw *middleware.Middleware) chi.Router {
 	r := chi.NewRouter()
 
-	// register routes here
+	// public route
 	r.Post("/google", h.CreateUser)
+
+	// protected routes
+	r.Group(func(r chi.Router) {
+
+		r.Use(mw.AuthenticateJWT) // -> middleware
+
+		r.Get("/profile", h.GetUser) 
+		
+	})
 	return r
 }
 
@@ -133,4 +147,23 @@ func (h *Handler) CreateUser(w http.ResponseWriter, r *http.Request) {
 	})
 	return
 
+}
+
+func (h *Handler) GetUser(w http.ResponseWriter, r *http.Request) {
+
+	userID, ok := middleware.GetUserID(r.Context())
+	if !ok {
+		utils.WriteError(w, http.StatusUnauthorized, "Unauthorized")
+		return
+	}
+
+	// db call
+	user, err := h.db.Queries.GetUserByID(r.Context(), userID)
+	if err != nil {
+		utils.WriteError(w, http.StatusNotFound, "User not found")
+		return
+	}
+
+	utils.WriteJSON(w, http.StatusOK, GetUserResponse{User: user})
+	return
 }

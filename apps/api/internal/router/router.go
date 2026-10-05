@@ -13,7 +13,7 @@ import (
 )
 
 type RouterConfig struct {
-	Middleware     middleware.Middleware
+	Middleware     *middleware.Middleware
 	GeminiHandler  *gemini.Handler
 	OpenAIHandler  *openai.Handler
 	Anthropic      *anthropic.Handler
@@ -35,7 +35,7 @@ func NewRouter(cfg *RouterConfig) *chi.Mux {
 	// Core Routes (LLM Routes)
 	r.Group(func(r chi.Router) {
 		// middleware
-		r.Use(cfg.Middleware.Authenticate)
+		r.Use(cfg.Middleware.AuthenticateLLM)
 
 		// mounting the gemini sub-routes
 		r.Mount("/v1beta", cfg.GeminiHandler.Routes())
@@ -49,8 +49,11 @@ func NewRouter(cfg *RouterConfig) *chi.Mux {
 	// registering NON-LLM routes
 	r.Route("/api/v1", func(r chi.Router) { // -> /api/v1/...
 
-		// user(auth) routes
-		r.Mount("/user", cfg.UserHandler.Routes()) // /api/v1/user/google -> creting user
+		// user(auth) routes -> Non Protected route
+		r.Mount("/user", cfg.UserHandler.Routes(cfg.Middleware)) // /api/v1/user/google -> creting user
+
+		// PROTECTED ROUTES
+
 		// project routes
 	})
 

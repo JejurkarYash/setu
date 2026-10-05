@@ -93,11 +93,11 @@ func main() {
 
 	// NON-LLM Handlers
 	userHandler := users.NewHandler(db, appLogger)
-	projectHandler := project.NewHandler(db,appLogger)
+	projectHandler := project.NewHandler(db, appLogger)
 
 	// constructing router config ( dependencies )
 	routerConfig := router.RouterConfig{
-		Middleware:     *middleware,
+		Middleware:     middleware,
 		GeminiHandler:  geminiHandler,
 		OpenAIHandler:  openAIHandler,
 		Anthropic:      anthropicHandler,

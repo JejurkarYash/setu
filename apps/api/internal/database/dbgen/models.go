@@ -70,11 +70,11 @@ type UsageLog struct {
 }
 
 type User struct {
-	ID        string
-	GoogleID  string
-	Email     string
-	Name      string
-	AvatarUrl pgtype.Text
-	CreatedAt pgtype.Timestamptz
-	UpdatedAt pgtype.Timestamptz
+	ID        string             `json:"id"`
+	GoogleID  string             `json:"google_id"`
+	Email     string             `json:"email"`
+	Name      string             `json:"name"`
+	AvatarUrl pgtype.Text        `json:"avtar_url"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
 }
