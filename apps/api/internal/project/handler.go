@@ -24,6 +24,10 @@ type CreateProjectRequest struct {
 	Budget float64 `json:"monthly_budget"`
 }
 
+type ListProjectsResponse struct {
+	Projects []dbgen.Project `json:"projects"`
+}
+
 func NewHandler(db *database.Database, logger *slog.Logger) *Handler {
 	return &Handler{
 		db:     db,
@@ -55,6 +59,12 @@ func (h *Handler) CreateProject(w http.ResponseWriter, r *http.Request) {
 		utils.WriteError(w, http.StatusBadRequest, err.Error())
 		return
 	}
+
+	if req.Budget == 0 || req.Name == "" {
+		utils.WriteError(w, http.StatusBadRequest, "name and budget required")
+		return
+	}
+
 	userID, ok := middleware.GetUserID(r.Context())
 	if !ok {
 		utils.WriteError(w, http.StatusUnauthorized, "invalid token")
@@ -88,6 +98,21 @@ func (h *Handler) CreateProject(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) ListProjects(w http.ResponseWriter, r *http.Request) {
 
+	userID, ok := middleware.GetUserID(r.Context())
+	if !ok {
+		utils.WriteError(w, http.StatusUnauthorized, "Invalid Token")
+		return
+	}
+
+	// getting projects from db
+	projects, err := h.db.Queries.ListProjectsByUserID(r.Context(), userID)
+	if err != nil {
+		utils.WriteError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	utils.WriteJSON(w, http.StatusOK, ListProjectsResponse{Projects: projects})
+	return
 }
 
 func (h *Handler) GetProjectByID(w http.ResponseWriter, r *http.Request) {
