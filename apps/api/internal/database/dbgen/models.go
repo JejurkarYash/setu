@@ -39,12 +39,12 @@ type ModelRate struct {
 }
 
 type Project struct {
-	ID            string
-	Name          string
-	UserID        string
-	MonthlyBudget float64
-	CreatedAt     pgtype.Timestamptz
-	UpdatedAt     pgtype.Timestamptz
+	ID            string             `json:"id"`
+	Name          string             `json:"name"`
+	UserID        string             `json:"user_id"`
+	MonthlyBudget float64            `json:"monthly_budget"`
+	CreatedAt     pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt     pgtype.Timestamptz `json:"updated_at"`
 }
 
 type ProviderKey struct {

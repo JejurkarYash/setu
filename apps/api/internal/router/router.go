@@ -52,9 +52,11 @@ func NewRouter(cfg *RouterConfig) *chi.Mux {
 		// user(auth) routes -> Non Protected route
 		r.Mount("/user", cfg.UserHandler.Routes(cfg.Middleware)) // /api/v1/user/google -> creting user
 
-		// PROTECTED ROUTES
-
-		// project routes
+		// PROTECTED ROUTES (Project)
+		r.Group(func(r chi.Router) {
+			r.Use(cfg.Middleware.AuthenticateJWT)
+			r.Mount("/projects", cfg.ProjectHandler.Routes()) // -> /api/v1/project
+		})
 	})
 
 	return r

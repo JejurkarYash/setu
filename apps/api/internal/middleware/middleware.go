@@ -46,7 +46,6 @@ func GetProjectID(ctx context.Context) (string, bool) {
 
 func GetUserID(ctx context.Context) (string, bool) {
 	val, ok := ctx.Value(userIDKey).(string)
-	fmt.Println("val:", val)
 	return val, ok
 }
 
