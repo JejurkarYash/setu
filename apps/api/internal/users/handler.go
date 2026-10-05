@@ -2,6 +2,7 @@ package users
 
 import (
 	"errors"
+	"log/slog"
 	"net/http"
 	"os"
 
@@ -15,7 +16,8 @@ import (
 )
 
 type Handler struct {
-	db *database.Database
+	db     *database.Database
+	logger *slog.Logger
 	// logger
 }
 
@@ -28,9 +30,10 @@ type AuthResponse struct {
 	User  *dbgen.User `json:"user"`
 }
 
-func NewHandler(db *database.Database) *Handler {
+func NewHandler(db *database.Database, logger *slog.Logger) *Handler {
 	return &Handler{
-		db: db,
+		db:     db,
+		logger: logger,
 	}
 }
 
@@ -57,28 +60,42 @@ func (h *Handler) CreateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	googleClientID := os.Getenv("GOOGLE_CLIENT_ID")
-	payload, err := idtoken.Validate(r.Context(), req.IDToken, googleClientID)
-	if err != nil {
-		utils.WriteError(w, http.StatusUnauthorized, "Invalid or Expired Google Token")
-		return
-	}
+	// development testing
+	var googleID, email, name, avtarURL string
+	if os.Getenv("ENV") == "development" && req.IDToken == "mock_token" {
 
-	email, _ := payload.Claims["email"].(string)
-	name, _ := payload.Claims["name"].(string)
-	avtarURL, _ := payload.Claims["picture"].(string)
+		googleID = "google_user_mock_123"
+		email = "runeshkakad@gmail.com"
+		name = "Runesh Kakad"
+		avtarURL = "htts://lh3.googleusercontent.com/a/default-user"
+
+	} else {
+
+		googleClientID := os.Getenv("GOOGLE_CLIENT_ID")
+		payload, err := idtoken.Validate(r.Context(), req.IDToken, googleClientID)
+		if err != nil {
+			utils.WriteError(w, http.StatusUnauthorized, "Invalid or Expired Google Token")
+			return
+		}
+
+		googleID = payload.Subject
+		email, _ = payload.Claims["email"].(string)
+		name, _ = payload.Claims["name"].(string)
+		avtarURL, _ = payload.Claims["picture"].(string)
+
+	}
 
 	var avtarURLText pgtype.Text
 	_ = avtarURLText.Scan(avtarURL)
 
 	// check if user exist or not
-	user, err := h.db.Queries.GetUserByGoogleID(r.Context(), payload.Subject)
+	user, err := h.db.Queries.GetUserByGoogleID(r.Context(), googleID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) { // -> user not present
 
-			// Storing in DB
+			// Storing in DB (creating new user )
 			user, err = h.db.Queries.CreateUser(r.Context(), dbgen.CreateUserParams{
-				GoogleID:  payload.Subject,
+				GoogleID:  googleID,
 				Email:     email,
 				Name:      name,
 				AvatarUrl: avtarURLText,
@@ -101,6 +118,13 @@ func (h *Handler) CreateUser(w http.ResponseWriter, r *http.Request) {
 		utils.WriteError(w, http.StatusInternalServerError, "failed to create JWT")
 		return
 	}
+
+	// logging (debug)
+	h.logger.Info("user authenticated successfully",
+		"user_id", user.ID,
+		"name", user.Name,
+		"email", user.Email,
+	)
 
 	// returning response
 	utils.WriteJSON(w, http.StatusOK, AuthResponse{

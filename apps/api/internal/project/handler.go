@@ -1,18 +1,21 @@
 package project
 
 import (
+	"log/slog"
 	"net/http"
 
 	"github.com/JejurkarYash/setu/internal/database"
 )
 
 type Handler struct {
-	db *database.Database
+	db     *database.Database
+	logger *slog.Logger
 }
 
-func NewHandler(db *database.Database) *Handler {
+func NewHandler(db *database.Database, logger *slog.Logger) *Handler {
 	return &Handler{
-		db: db,
+		db:     db,
+		logger: logger,
 	}
 }
 

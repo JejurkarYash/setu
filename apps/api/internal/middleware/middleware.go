@@ -54,7 +54,7 @@ func NewMiddleware(db *database.Database, rdb *redis.Client, logger *slog.Logger
 	}
 }
 
-// middlware
+// LLM Routes middlware
 func (m *Middleware) Authenticate(next http.Handler) http.Handler {
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -210,3 +210,7 @@ func (m *Middleware) Authenticate(next http.Handler) http.Handler {
 	})
 
 }
+
+// NON LLM Routes middleware 
+// func (m *Middleware)
+

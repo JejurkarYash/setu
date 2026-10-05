@@ -46,7 +46,13 @@ func NewRouter(cfg *RouterConfig) *chi.Mux {
 
 	})
 
-	// registering remaining routes
+	// registering NON-LLM routes
+	r.Route("/api/v1", func(r chi.Router) { // -> /api/v1/...
+
+		// user(auth) routes
+		r.Mount("/user", cfg.UserHandler.Routes()) // /api/v1/user/google -> creting user
+		// project routes
+	})
 
 	return r
 }
