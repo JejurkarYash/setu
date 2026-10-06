@@ -30,3 +30,11 @@ RETURNING *;
 -- name: DeleteProject :exec
 DELETE FROM projects
 WHERE id = $1;
+
+
+-- name: UpdateProject :one
+UPDATE projects
+SET name = $2, monthly_budget = $3, updated_at = NOW()
+WHERE id = $1
+RETURNING *;
+

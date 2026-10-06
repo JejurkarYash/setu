@@ -11,6 +11,7 @@ import (
 	"github.com/JejurkarYash/setu/internal/lib/utils"
 	"github.com/JejurkarYash/setu/internal/middleware"
 	"github.com/go-chi/chi"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 )
 
@@ -26,6 +27,15 @@ type CreateProjectRequest struct {
 
 type ListProjectsResponse struct {
 	Projects []dbgen.Project `json:"projects"`
+}
+
+type UpdateProjectResponse struct {
+	Project dbgen.Project
+}
+
+type UpdateProjectRequest struct {
+	Name   string  `json:"name"`
+	Budget float64 `json:"monthly_budget"`
 }
 
 func NewHandler(db *database.Database, logger *slog.Logger) *Handler {
@@ -117,11 +127,105 @@ func (h *Handler) ListProjects(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) GetProjectByID(w http.ResponseWriter, r *http.Request) {
 
+	projectID := chi.URLParam(r, "id")
+	if projectID == "" {
+		utils.WriteError(w, http.StatusBadRequest, "project id required")
+		return
+	}
+
+	// fetching project from db
+	project, err := h.db.Queries.GetProjectByID(r.Context(), projectID)
+	var pgErr *pgconn.PgError
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			utils.WriteError(w, http.StatusNotFound, "record not found")
+			return
+		}
+
+		if errors.As(err, &pgErr) {
+			if pgErr.Code == "22P02" {
+				utils.WriteError(w, http.StatusBadRequest, "provide valid id")
+				return
+			}
+		}
+
+		utils.WriteError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	utils.WriteJSON(w, http.StatusOK, project)
+	return
+
 }
 
 func (h *Handler) UpdateProject(w http.ResponseWriter, r *http.Request) {
 
+	projectID := chi.URLParam(r, "id")
+	if projectID == "" {
+		utils.WriteError(w, http.StatusBadRequest, "project id required")
+		return
+	}
+
+	userID, ok := middleware.GetUserID(r.Context())
+	if !ok {
+		utils.WriteError(w, http.StatusUnauthorized, "Invalid token")
+		return
+	}
+
+	var req UpdateProjectRequest
+	err := utils.ReadJSON(r, &req)
+	if err != nil {
+		utils.WriteError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	// check if project with this id present or not
+	existingProject, err := h.db.Queries.GetProjectByID(r.Context(), projectID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			utils.WriteError(w, http.StatusNotFound, "project not found")
+			return
+		}
+
+		utils.WriteError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if existingProject.UserID != userID {
+		utils.WriteError(w, http.StatusForbidden, "you do not have permission to update this project")
+		return
+	}
+
+	updatedName := existingProject.Name
+	if req.Name != "" {
+		updatedName = req.Name
+	}
+	updatedBudget := existingProject.MonthlyBudget
+	if req.Budget > 0 {
+		updatedBudget = req.Budget
+	}
+
+	// update/patch the request
+	project, err := h.db.Queries.UpdateProject(r.Context(), dbgen.UpdateProjectParams{
+		ID:            projectID,
+		Name:          updatedName,
+		MonthlyBudget: updatedBudget,
+	})
+	var pgErr *pgconn.PgError
+	if err != nil {
+		if errors.As(err, &pgErr) {
+			if pgErr.Code == "23505" {
+				utils.WriteError(w, http.StatusConflict, "project with this name already exist")
+				return
+			}
+		}
+		utils.WriteError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	utils.WriteJSON(w, http.StatusOK, UpdateProjectResponse{Project: project})
+	return
 }
+
 func (h *Handler) ResetMonthlyBudgetUsage(w http.ResponseWriter, r *http.Request) {
 
 }

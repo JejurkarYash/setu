@@ -128,6 +128,33 @@ func (q *Queries) ListProjectsByUserID(ctx context.Context, userID string) ([]Pr
 	return items, nil
 }
 
+const updateProject = `-- name: UpdateProject :one
+UPDATE projects
+SET name = $2, monthly_budget = $3, updated_at = NOW()
+WHERE id = $1
+RETURNING id, name, user_id, monthly_budget, created_at, updated_at
+`
+
+type UpdateProjectParams struct {
+	ID            string
+	Name          string
+	MonthlyBudget float64
+}
+
+func (q *Queries) UpdateProject(ctx context.Context, arg UpdateProjectParams) (Project, error) {
+	row := q.db.QueryRow(ctx, updateProject, arg.ID, arg.Name, arg.MonthlyBudget)
+	var i Project
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.UserID,
+		&i.MonthlyBudget,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const updateProjectBudget = `-- name: UpdateProjectBudget :one
 UPDATE projects
 SET monthly_budget = $2, updated_at = NOW()

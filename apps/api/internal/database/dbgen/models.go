@@ -39,12 +39,12 @@ type ModelRate struct {
 }
 
 type Project struct {
-	ID            string             `json:"id"`
-	Name          string             `json:"name"`
-	UserID        string             `json:"user_id"`
-	MonthlyBudget float64            `json:"monthly_budget"`
-	CreatedAt     pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt     pgtype.Timestamptz `json:"updated_at"`
+	ID            string
+	Name          string
+	UserID        string
+	MonthlyBudget float64
+	CreatedAt     pgtype.Timestamptz
+	UpdatedAt     pgtype.Timestamptz
 }
 
 type ProviderKey struct {
@@ -70,11 +70,11 @@ type UsageLog struct {
 }
 
 type User struct {
-	ID        string             `json:"id"`
-	GoogleID  string             `json:"google_id"`
-	Email     string             `json:"email"`
-	Name      string             `json:"name"`
-	AvatarUrl pgtype.Text        `json:"avtar_url"`
-	CreatedAt pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
+	ID        string
+	GoogleID  string
+	Email     string
+	Name      string
+	AvatarUrl pgtype.Text
+	CreatedAt pgtype.Timestamptz
+	UpdatedAt pgtype.Timestamptz
 }
