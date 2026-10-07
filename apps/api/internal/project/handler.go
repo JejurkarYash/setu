@@ -304,4 +304,54 @@ func (h *Handler) ResetMonthlyBudgetUsage(w http.ResponseWriter, r *http.Request
 
 func (h *Handler) DeleteProject(w http.ResponseWriter, r *http.Request) {
 
+	projectID := chi.URLParam(r, "id")
+	if projectID == "" {
+		utils.WriteError(w, http.StatusBadRequest, "project id is required")
+		return
+	}
+
+	userID, ok := middleware.GetUserID(r.Context())
+	if !ok {
+		utils.WriteError(w, http.StatusUnauthorized, "invalid token")
+		return
+	}
+
+	// // Attach contextual fields for structured logging
+	logger := h.logger.With(
+		slog.String("user_id", userID),
+		slog.String("project_id", projectID),
+	)
+
+	// checking ownership
+	project, err := h.db.Queries.GetProjectByID(r.Context(), projectID)
+	if err != nil {
+		if errors.As(err, pgx.ErrNoRows) {
+			logger.Warn("delete project failed: project not found")
+			utils.WriteError(w, http.StatusNotFound, "project not found")
+			return
+		}
+
+		logger.Error("failed to fetch project for deletion", slog.Any("err", err))
+		utils.WriteError(w, http.StatusInternalServerError, "failed to delete project")
+		return
+	}
+
+	if project.UserID != userID {
+		logger.Warn("unauthorized attempt to delete project", slog.String("owner_id", project.ID))
+		utils.WriteError(w, http.StatusForbidden, "you don't have access to this project")
+		return
+	}
+
+	// delete the project
+	err = h.db.Queries.DeleteProject(r.Context(), projectID)
+	if err != nil {
+		logger.Error("failed to delete project", slog.Any("err", err))
+		utils.WriteError(w, http.StatusInternalServerError, "failed to delete project")
+		return
+	}
+
+	logger.Info("project deleted successfully")
+
+	w.WriteHeader(http.StatusNoContent)
+
 }
