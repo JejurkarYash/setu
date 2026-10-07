@@ -60,6 +60,14 @@ func (c *Client) GetSpend(ctx context.Context, projectID string) (float64, error
 	return val, nil
 }
 
+// reset spend (cache invalidation)
+func (c *Client) ResetSpend(ctx context.Context, projectID string) error {
+	currMonth := time.Now().UTC().Format("2006-01")
+	key := fmt.Sprintf("project:%s:spend:%s", projectID, currMonth)
+	return c.rdb.Del(ctx, key).Err()
+
+}
+
 // auth middleware methods
 func (c *Client) GetKeyMetadata(ctx context.Context, hashedKey string) (*KeyMetadata, error) {
 	// get the val from redis
@@ -89,4 +97,11 @@ func (c *Client) SetKeyMetadata(ctx context.Context, hashedKey string, metadata 
 	}
 
 	return c.rdb.Set(ctx, key, val, ttl).Err()
+}
+
+// cache invalidation
+func (c *Client) DeleteKeyMetadata(ctx context.Context, hashedKey string) error {
+
+	key := "api_key:" + hashedKey
+	return c.rdb.Del(ctx, key).Err()
 }

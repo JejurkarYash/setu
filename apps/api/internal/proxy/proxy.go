@@ -9,8 +9,7 @@ import (
 	"net/url"
 
 	"github.com/JejurkarYash/setu/internal/database"
-	"github.com/JejurkarYash/setu/internal/database/dbgen"
-	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/JejurkarYash/setu/internal/telemetry"
 )
 
 // provider interface
@@ -40,14 +39,16 @@ type Engine struct {
 	provider Provider
 	Logger   *slog.Logger
 	db       *database.Database
+	batcher  *telemetry.Batcher
 }
 
 // proxy init
-func NewProxyEngine(p Provider, logger *slog.Logger, db *database.Database) *Engine {
+func NewProxyEngine(p Provider, logger *slog.Logger, db *database.Database, batcher *telemetry.Batcher) *Engine {
 	return &Engine{
 		provider: p,
 		Logger:   logger,
 		db:       db,
+		batcher:  batcher,
 	}
 }
 
@@ -100,19 +101,14 @@ func (e *Engine) SetupProxyEngine() *httputil.ReverseProxy {
 					e.Logger.Error("failed to get the data from update spend", slog.Any("err", error))
 				}
 
-				// database log -> for analytics purpose
-				var projectUUID pgtype.UUID
-				if err := projectUUID.Scan(projectId); err != nil {
-					e.Logger.Error("failed to parse projectID as UUID", slog.Any("error", err))
-				}
-
-				e.db.Queries.InsertUsageLog(detachedCtx, dbgen.InsertUsageLogParams{
-					ProjectID:        projectUUID,
-					Model:            modelName,
-					PromptTokens:     int32(inputToken),
-					CompletionTokens: int32(outputToken),
-					StatusCode:       200,
-					CostUsd:          float64(totalCost),
+				// put this task into -> channel for later proced (usage log & update spend into db)
+				e.batcher.Enqueue(telemetry.BatcherEvent{
+					ProjectID:   projectId,
+					Model:       modelName,
+					InputToken:  inputToken,
+					OutputToken: outputToken,
+					TotalCost:   totalCost,
+					StatusCode:  200,
 				})
 
 			}()

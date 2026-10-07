@@ -48,80 +48,84 @@ func main() {
 	}
 
 	fmt.Println("Seeding Database...")
-	// 1. Get or create user
-	user, err := db.Queries.GetUserByEmail(context.Background(), "suraj@gmail.com")
-	if err != nil {
-		user, err = db.Queries.CreateUser(context.Background(), dbgen.CreateUserParams{
-			GoogleID: "abc4",
-			Email:    "suraj@gmail.com",
-			Name:     "Suraj Sangle",
-			AvatarUrl: pgtype.Text{
-				Valid: false,
-			},
-		})
-		if err != nil {
-			log.Fatal("failed to create USER: ", err)
-			os.Exit(1)
-		}
-		fmt.Println("User Created Successfully:", user.ID)
-	} else {
-		fmt.Println("Using Existing User:", user.ID)
-	}
 
-	// 2. Creating standard project with sufficient budget ($100)
-	project, err := db.Queries.CreateProject(context.Background(), dbgen.CreateProjectParams{
-		Name:          "OpenAI Test Project",
-		UserID:        user.ID,
-		MonthlyBudget: 100.0,
-	})
-	if err != nil {
-		log.Fatal("failed to create PROJECT: ", err)
-		os.Exit(1)
-	}
-	fmt.Println("Standard Project Created Successfully:", project.ID)
-
-	// 3. Creating Setu API key for standard OpenAI testing
-	rawKey := "setu_test_key_openai"
-	hash := sha256.Sum256([]byte(rawKey))
-	hashedKey := hex.EncodeToString(hash[:])
-
-	apiKey, err := db.Queries.CreateApiKey(context.Background(), dbgen.CreateApiKeyParams{
-		ProjectID: project.ID,
-		KeyPrefix: "setu_live_openai",
-		KeyHash:   hashedKey,
-		ExpiresAt: pgtype.Timestamptz{
+	// 1.  create new user
+	user, err := db.Queries.CreateUser(context.Background(), dbgen.CreateUserParams{
+		GoogleID: "google-mock-123",
+		Email:    "naruto@gmail.com",
+		Name:     "Naruto Uzumaki",
+		AvatarUrl: pgtype.Text{
 			Valid: false,
 		},
 	})
 	if err != nil {
-		log.Fatal("failed to create API KEY: ", err)
+		log.Fatal("failed to create USER: ", err)
 		os.Exit(1)
 	}
-	fmt.Println("Standard API Key Created Successfully:", apiKey.KeyPrefix)
+	fmt.Println("User Created Successfully:", user.ID)
 
-	// 4. Encrypt and save provider keys for standard project
+	// sign jwT
+	jwtToken, err := utils.GenerateJWT(user.ID)
+	if err != nil {
+		fmt.Println("error generating jwt", err)
+	}
+
+	fmt.Println("token:", jwtToken)
+
+	// 2. Creating standard project with sufficient budget ($100)
+	// project, err := db.Queries.CreateProject(context.Background(), dbgen.CreateProjectParams{
+	// 	Name:          "OpenAI Test Project",
+	// 	UserID:        user.ID,
+	// 	MonthlyBudget: 100.0,
+	// })
+	// if err != nil {
+	// 	log.Fatal("failed to create PROJECT: ", err)
+	// 	os.Exit(1)
+	// }
+	// fmt.Println("Standard Project Created Successfully:", project.ID)
+
+	// // 3. Creating Setu API key for standard OpenAI testing
+	// rawKey := "setu_test_key_openai"
+	// hash := sha256.Sum256([]byte(rawKey))
+	// hashedKey := hex.EncodeToString(hash[:])
+
+	// apiKey, err := db.Queries.CreateApiKey(context.Background(), dbgen.CreateApiKeyParams{
+	// 	ProjectID: project.ID,
+	// 	KeyPrefix: "setu_live_openai",
+	// 	KeyHash:   hashedKey,
+	// 	ExpiresAt: pgtype.Timestamptz{
+	// 		Valid: false,
+	// 	},
+	// })
+	// if err != nil {
+	// 	log.Fatal("failed to create API KEY: ", err)
+	// 	os.Exit(1)
+	// }
+	// fmt.Println("Standard API Key Created Successfully:", apiKey.KeyPrefix)
+
+	// // 4. Encrypt and save provider keys for standard project
 	encryptor, err := utils.NewEncryptor(config.Encryption.MasterKey)
 	if err != nil {
 		log.Fatal("failed to initialize encryptor: ", err)
 		os.Exit(1)
 	}
 
-	encryptedKey, nonce, err := encryptor.Encrypt("sk-mock-openai-key-for-testing")
-	if err != nil {
-		log.Fatal("failed to encrypt key: ", err)
-		os.Exit(1)
-	}
+	// encryptedKey, nonce, err := encryptor.Encrypt("sk-mock-openai-key-for-testing")
+	// if err != nil {
+	// 	log.Fatal("failed to encrypt key: ", err)
+	// 	os.Exit(1)
+	// }
 
-	_, err = db.Queries.CreateProviderKey(context.Background(), dbgen.CreateProviderKeyParams{
-		ProjectID:    project.ID,
-		Provider:     "openai",
-		EncryptedKey: encryptedKey,
-		Nonce:        nonce,
-	})
-	if err != nil {
-		log.Fatal("failed to create providerKey for openai: ", err)
-		os.Exit(1)
-	}
+	// _, err = db.Queries.CreateProviderKey(context.Background(), dbgen.CreateProviderKeyParams{
+	// 	ProjectID:    project.ID,
+	// 	Provider:     "openai",
+	// 	EncryptedKey: encryptedKey,
+	// 	Nonce:        nonce,
+	// })
+	// if err != nil {
+	// 	log.Fatal("failed to create providerKey for openai: ", err)
+	// 	os.Exit(1)
+	// }
 
 	// 5. Creating a LOW BUDGET PROJECT for quota/rate limit testing ($0.0008)
 	// Each mock gpt-5.5 request costs ~$0.000435, so 2 requests pass and the 3rd gets blocked!
@@ -173,11 +177,11 @@ func main() {
 		os.Exit(1)
 	}
 
-	fmt.Println("\n==========================================")
-	fmt.Println("Seeding Completed Successfully!")
-	fmt.Println("------------------------------------------")
-	fmt.Println("1. Standard Project ($100 budget):")
-	fmt.Printf("   Key: %s\n", rawKey)
+	// fmt.Println("\n==========================================")
+	// fmt.Println("Seeding Completed Successfully!")
+	// fmt.Println("-----------------------------------------")
+	// fmt.Println("1. Standard Project ($100 budget):")
+	// fmt.Printf("   Key: %s\n", rawKey)
 	fmt.Println("------------------------------------------")
 	fmt.Println("2. Low Budget Project ($0.0008 budget):")
 	fmt.Printf("   Key: %s\n", lowBudgetRawKey)

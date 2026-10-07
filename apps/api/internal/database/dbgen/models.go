@@ -45,6 +45,7 @@ type Project struct {
 	MonthlyBudget float64
 	CreatedAt     pgtype.Timestamptz
 	UpdatedAt     pgtype.Timestamptz
+	Spend         float64
 }
 
 type ProviderKey struct {

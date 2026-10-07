@@ -2,7 +2,6 @@ package project
 
 import (
 	"errors"
-	"fmt"
 	"log/slog"
 	"net/http"
 
@@ -10,6 +9,7 @@ import (
 	"github.com/JejurkarYash/setu/internal/database/dbgen"
 	"github.com/JejurkarYash/setu/internal/lib/utils"
 	"github.com/JejurkarYash/setu/internal/middleware"
+	"github.com/JejurkarYash/setu/internal/redis"
 	"github.com/go-chi/chi"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -18,6 +18,7 @@ import (
 type Handler struct {
 	db     *database.Database
 	logger *slog.Logger
+	rdb    *redis.Client
 }
 
 type CreateProjectRequest struct {
@@ -38,10 +39,11 @@ type UpdateProjectRequest struct {
 	Budget float64 `json:"monthly_budget"`
 }
 
-func NewHandler(db *database.Database, logger *slog.Logger) *Handler {
+func NewHandler(db *database.Database, logger *slog.Logger, rdb *redis.Client) *Handler {
 	return &Handler{
 		db:     db,
 		logger: logger,
+		rdb:    rdb,
 	}
 }
 
@@ -66,7 +68,7 @@ func (h *Handler) CreateProject(w http.ResponseWriter, r *http.Request) {
 
 	var req CreateProjectRequest
 	if err := utils.ReadJSON(r, &req); err != nil {
-		utils.WriteError(w, http.StatusBadRequest, err.Error())
+		utils.WriteError(w, http.StatusBadRequest, "Bad Request")
 		return
 	}
 
@@ -81,7 +83,6 @@ func (h *Handler) CreateProject(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	fmt.Println("budget:", req.Budget)
 	parms := dbgen.CreateProjectParams{
 		Name:          req.Name,
 		MonthlyBudget: req.Budget,
@@ -98,7 +99,8 @@ func (h *Handler) CreateProject(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 		}
-		utils.WriteError(w, http.StatusInternalServerError, err.Error())
+		h.logger.Error("failed to create project", slog.Any("err", err))
+		utils.WriteError(w, http.StatusInternalServerError, "failed to create project")
 		return
 	}
 
@@ -117,7 +119,8 @@ func (h *Handler) ListProjects(w http.ResponseWriter, r *http.Request) {
 	// getting projects from db
 	projects, err := h.db.Queries.ListProjectsByUserID(r.Context(), userID)
 	if err != nil {
-		utils.WriteError(w, http.StatusInternalServerError, err.Error())
+		h.logger.Error("failed to fetch project", slog.Any("err", err))
+		utils.WriteError(w, http.StatusInternalServerError, "failed to fetch project")
 		return
 	}
 
@@ -149,7 +152,8 @@ func (h *Handler) GetProjectByID(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
-		utils.WriteError(w, http.StatusInternalServerError, err.Error())
+		h.logger.Error("failed to fetch project", slog.Any("err", err))
+		utils.WriteError(w, http.StatusInternalServerError, "failed to fetch project")
 		return
 	}
 
@@ -186,8 +190,8 @@ func (h *Handler) UpdateProject(w http.ResponseWriter, r *http.Request) {
 			utils.WriteError(w, http.StatusNotFound, "project not found")
 			return
 		}
-
-		utils.WriteError(w, http.StatusInternalServerError, err.Error())
+		h.logger.Error("failed to fetch the project", slog.Any("err", err))
+		utils.WriteError(w, http.StatusInternalServerError, "failed to fetch project")
 		return
 	}
 	if existingProject.UserID != userID {
@@ -199,6 +203,7 @@ func (h *Handler) UpdateProject(w http.ResponseWriter, r *http.Request) {
 	if req.Name != "" {
 		updatedName = req.Name
 	}
+
 	updatedBudget := existingProject.MonthlyBudget
 	if req.Budget > 0 {
 		updatedBudget = req.Budget
@@ -218,16 +223,83 @@ func (h *Handler) UpdateProject(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 		}
-		utils.WriteError(w, http.StatusInternalServerError, err.Error())
+		h.logger.Error("failed to update the project", slog.Any("err", err))
+		utils.WriteError(w, http.StatusInternalServerError, "failed to update the project")
 		return
+	}
+
+	// cache invalidation
+	if req.Budget > 0 {
+		// call api key to get hash
+		keyHash, err := h.db.Queries.GetKeyHashFromProjectID(r.Context(), projectID)
+		if err != nil {
+			h.logger.Warn("(cache invalidation):failed to fetch key hash from db", slog.String("project_id", projectID))
+		}
+
+		// metadata
+		err = h.rdb.DeleteKeyMetadata(r.Context(), keyHash)
+		if err != nil {
+			h.logger.Warn("(cache invalidation):failed to delete keyMetadata from redis", slog.String("project_id", projectID))
+		}
 	}
 
 	utils.WriteJSON(w, http.StatusOK, UpdateProjectResponse{Project: project})
 	return
 }
 
+// cache Invalidation
 func (h *Handler) ResetMonthlyBudgetUsage(w http.ResponseWriter, r *http.Request) {
 
+	projectID := chi.URLParam(r, "id")
+	if projectID == "" {
+		utils.WriteError(w, http.StatusBadRequest, "project id is required")
+		return
+	}
+
+	userID, ok := middleware.GetUserID(r.Context())
+	if !ok {
+		utils.WriteError(w, http.StatusUnauthorized, "invalid token")
+		return
+	}
+
+	// checking if this project is belongs to this user
+	project, err := h.db.Queries.GetProjectByID(r.Context(), projectID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) { // that means no project found with tihs
+			utils.WriteError(w, http.StatusForbidden, "project not found")
+			return
+		}
+
+		h.logger.Error("failed to fetch projec", slog.Any("err", err))
+		utils.WriteError(w, http.StatusInternalServerError, "failed to fetch project")
+		return
+	}
+
+	// safty check
+	if project.UserID != userID {
+		utils.WriteError(w, http.StatusForbidden, "you don't have access to this project")
+		return
+	}
+
+	// reseting  spend into db
+	_, err = h.db.Queries.UpdateSpendDB(r.Context(), dbgen.UpdateSpendDBParams{
+		ID:    projectID,
+		Spend: 0.00,
+	})
+	if err != nil {
+		h.logger.Error("failed to update spend into db", slog.Any("err", err))
+		utils.WriteError(w, http.StatusInternalServerError, "failed to update usage database")
+		return
+	}
+
+	if err := h.rdb.ResetSpend(r.Context(), projectID); err != nil {
+		// Log error, but don't fail response since PostgreSQL update succeeded
+		h.logger.Warn("failed to reset spend cache in redis", slog.String("project_id", projectID), slog.Any("error", err))
+	}
+
+	utils.WriteJSON(w, http.StatusOK, map[string]string{
+		"message": "Successfully reset monthly usage",
+	})
 }
 
 func (h *Handler) DeleteProject(w http.ResponseWriter, r *http.Request) {

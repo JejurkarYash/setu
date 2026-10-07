@@ -77,6 +77,20 @@ func (q *Queries) GetActiveKeyMetadata(ctx context.Context, keyHash string) (Get
 	return i, err
 }
 
+const getKeyHashFromProjectID = `-- name: GetKeyHashFromProjectID :one
+SELECT key_hash
+FROM api_key
+WHERE project_id = $1
+  AND is_active = TRUE
+`
+
+func (q *Queries) GetKeyHashFromProjectID(ctx context.Context, projectID string) (string, error) {
+	row := q.db.QueryRow(ctx, getKeyHashFromProjectID, projectID)
+	var key_hash string
+	err := row.Scan(&key_hash)
+	return key_hash, err
+}
+
 const getProjectIDFromKeyHash = `-- name: GetProjectIDFromKeyHash :one
 SELECT project_id FROM api_key
 WHERE key_hash = $1

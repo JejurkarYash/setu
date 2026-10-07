@@ -38,3 +38,13 @@ SET name = $2, monthly_budget = $3, updated_at = NOW()
 WHERE id = $1
 RETURNING *;
 
+-- name: GetProjectByUserIDAndProjectID :one 
+SELECT * FROM projects 
+WHERE id = $1 AND user_id = $2; 
+
+-- name: UpdateSpendDB :one 
+UPDATE projects
+SET spend = spend + $1,
+    updated_at = NOW()
+WHERE id = $2
+RETURNING *;

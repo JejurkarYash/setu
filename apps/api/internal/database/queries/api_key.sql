@@ -34,3 +34,9 @@ WHERE id = $1;
 -- name: DeleteApiKey :exec
 DELETE FROM api_key
 WHERE id = $1;
+
+-- name: GetKeyHashFromProjectID :one
+SELECT key_hash
+FROM api_key
+WHERE project_id = $1
+  AND is_active = TRUE;

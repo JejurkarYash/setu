@@ -17,6 +17,7 @@ import (
 	"github.com/JejurkarYash/setu/internal/middleware"
 	"github.com/JejurkarYash/setu/internal/proxy"
 	"github.com/JejurkarYash/setu/internal/redis"
+	"github.com/JejurkarYash/setu/internal/telemetry"
 	"github.com/go-chi/chi"
 )
 
@@ -50,14 +51,15 @@ type OpenAIJSONResponse struct {
 }
 
 // openai handler init
-func NewHandler(cfg *config.Config, logger *slog.Logger, rdb *redis.Client, db *database.Database) *Handler {
+func NewHandler(cfg *config.Config, logger *slog.Logger, rdb *redis.Client, db *database.Database, batcher *telemetry.Batcher) *Handler {
 	h := &Handler{
 		cfg:    cfg,
 		logger: logger,
 		rdb:    rdb,
 	}
 
-	proxy := proxy.NewProxyEngine(h, logger, db)
+	// proxy init
+	proxy := proxy.NewProxyEngine(h, logger, db, batcher)
 	h.proxy = proxy.SetupProxyEngine()
 
 	return h
@@ -129,6 +131,7 @@ func (h *Handler) UpdateSpend(ctx context.Context, inputToken, outputToken int) 
 		projectID = "test:ABC"
 	}
 
+	// total cost per request
 	totalCost := billing.CalculateCost(model, inputToken, outputToken)
 
 	// loggin for debug

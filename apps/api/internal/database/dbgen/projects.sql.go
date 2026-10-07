@@ -12,7 +12,7 @@ import (
 const createProject = `-- name: CreateProject :one
 INSERT INTO projects ( name, user_id, monthly_budget)
 VALUES ($1, $2, $3)
-RETURNING id, name, user_id, monthly_budget, created_at, updated_at
+RETURNING id, name, user_id, monthly_budget, created_at, updated_at, spend
 `
 
 type CreateProjectParams struct {
@@ -31,6 +31,7 @@ func (q *Queries) CreateProject(ctx context.Context, arg CreateProjectParams) (P
 		&i.MonthlyBudget,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Spend,
 	)
 	return i, err
 }
@@ -46,7 +47,7 @@ func (q *Queries) DeleteProject(ctx context.Context, id string) error {
 }
 
 const getAllProjects = `-- name: GetAllProjects :many
-SELECT id, name, user_id, monthly_budget, created_at, updated_at FROM projects
+SELECT id, name, user_id, monthly_budget, created_at, updated_at, spend FROM projects
 `
 
 func (q *Queries) GetAllProjects(ctx context.Context) ([]Project, error) {
@@ -65,6 +66,7 @@ func (q *Queries) GetAllProjects(ctx context.Context) ([]Project, error) {
 			&i.MonthlyBudget,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.Spend,
 		); err != nil {
 			return nil, err
 		}
@@ -77,7 +79,7 @@ func (q *Queries) GetAllProjects(ctx context.Context) ([]Project, error) {
 }
 
 const getProjectByID = `-- name: GetProjectByID :one
-SELECT id, name, user_id, monthly_budget, created_at, updated_at FROM projects
+SELECT id, name, user_id, monthly_budget, created_at, updated_at, spend FROM projects
 WHERE id = $1 LIMIT 1
 `
 
@@ -91,12 +93,38 @@ func (q *Queries) GetProjectByID(ctx context.Context, id string) (Project, error
 		&i.MonthlyBudget,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Spend,
+	)
+	return i, err
+}
+
+const getProjectByUserIDAndProjectID = `-- name: GetProjectByUserIDAndProjectID :one
+SELECT id, name, user_id, monthly_budget, created_at, updated_at, spend FROM projects 
+WHERE id = $1 AND user_id = $2
+`
+
+type GetProjectByUserIDAndProjectIDParams struct {
+	ID     string
+	UserID string
+}
+
+func (q *Queries) GetProjectByUserIDAndProjectID(ctx context.Context, arg GetProjectByUserIDAndProjectIDParams) (Project, error) {
+	row := q.db.QueryRow(ctx, getProjectByUserIDAndProjectID, arg.ID, arg.UserID)
+	var i Project
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.UserID,
+		&i.MonthlyBudget,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.Spend,
 	)
 	return i, err
 }
 
 const listProjectsByUserID = `-- name: ListProjectsByUserID :many
-SELECT id, name, user_id, monthly_budget, created_at, updated_at FROM projects
+SELECT id, name, user_id, monthly_budget, created_at, updated_at, spend FROM projects
 WHERE user_id = $1
 ORDER BY created_at DESC
 `
@@ -117,6 +145,7 @@ func (q *Queries) ListProjectsByUserID(ctx context.Context, userID string) ([]Pr
 			&i.MonthlyBudget,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.Spend,
 		); err != nil {
 			return nil, err
 		}
@@ -132,7 +161,7 @@ const updateProject = `-- name: UpdateProject :one
 UPDATE projects
 SET name = $2, monthly_budget = $3, updated_at = NOW()
 WHERE id = $1
-RETURNING id, name, user_id, monthly_budget, created_at, updated_at
+RETURNING id, name, user_id, monthly_budget, created_at, updated_at, spend
 `
 
 type UpdateProjectParams struct {
@@ -151,6 +180,7 @@ func (q *Queries) UpdateProject(ctx context.Context, arg UpdateProjectParams) (P
 		&i.MonthlyBudget,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Spend,
 	)
 	return i, err
 }
@@ -159,7 +189,7 @@ const updateProjectBudget = `-- name: UpdateProjectBudget :one
 UPDATE projects
 SET monthly_budget = $2, updated_at = NOW()
 WHERE id = $1
-RETURNING id, name, user_id, monthly_budget, created_at, updated_at
+RETURNING id, name, user_id, monthly_budget, created_at, updated_at, spend
 `
 
 type UpdateProjectBudgetParams struct {
@@ -177,6 +207,7 @@ func (q *Queries) UpdateProjectBudget(ctx context.Context, arg UpdateProjectBudg
 		&i.MonthlyBudget,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Spend,
 	)
 	return i, err
 }
@@ -185,7 +216,7 @@ const updateProjectName = `-- name: UpdateProjectName :one
 UPDATE projects
 SET name = $2, updated_at = NOW()
 WHERE id = $1
-RETURNING id, name, user_id, monthly_budget, created_at, updated_at
+RETURNING id, name, user_id, monthly_budget, created_at, updated_at, spend
 `
 
 type UpdateProjectNameParams struct {
@@ -203,6 +234,35 @@ func (q *Queries) UpdateProjectName(ctx context.Context, arg UpdateProjectNamePa
 		&i.MonthlyBudget,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Spend,
+	)
+	return i, err
+}
+
+const updateSpendDB = `-- name: UpdateSpendDB :one
+UPDATE projects
+SET spend = spend + $1,
+    updated_at = NOW()
+WHERE id = $2
+RETURNING id, name, user_id, monthly_budget, created_at, updated_at, spend
+`
+
+type UpdateSpendDBParams struct {
+	Spend float64
+	ID    string
+}
+
+func (q *Queries) UpdateSpendDB(ctx context.Context, arg UpdateSpendDBParams) (Project, error) {
+	row := q.db.QueryRow(ctx, updateSpendDB, arg.Spend, arg.ID)
+	var i Project
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.UserID,
+		&i.MonthlyBudget,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.Spend,
 	)
 	return i, err
 }

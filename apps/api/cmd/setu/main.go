@@ -24,6 +24,7 @@ import (
 	"github.com/JejurkarYash/setu/internal/redis"
 	"github.com/JejurkarYash/setu/internal/router"
 	"github.com/JejurkarYash/setu/internal/server"
+	"github.com/JejurkarYash/setu/internal/telemetry"
 	"github.com/JejurkarYash/setu/internal/users"
 )
 
@@ -81,19 +82,23 @@ func main() {
 		appLogger.Debug("redis is connected...")
 	}
 
+	// batcher ( for processing events )  -> also spin 5 background goroutines to process events
+	batcher := telemetry.NewBatcher(db, appLogger, 1000, 5)
+
 	// creating new encrytor
 	encryptor, _ := utils.NewEncryptor(config.Encryption.MasterKey)
 	// middleware init
 	middleware := middleware.NewMiddleware(db, rdb, appLogger, encryptor)
 
+
 	// LLM Provider Handlers
-	geminiHandler := gemini.NewHandler(config, appLogger, rdb, db)
-	openAIHandler := openai.NewHandler(config, appLogger, rdb, db)
-	anthropicHandler := anthropic.NewHandler(config, appLogger, rdb, db)
+	geminiHandler := gemini.NewHandler(config, appLogger, rdb, db, batcher)
+	openAIHandler := openai.NewHandler(config, appLogger, rdb, db, batcher)
+	anthropicHandler := anthropic.NewHandler(config, appLogger, rdb, db, batcher)
 
 	// NON-LLM Handlers
 	userHandler := users.NewHandler(db, appLogger)
-	projectHandler := project.NewHandler(db, appLogger)
+	projectHandler := project.NewHandler(db, appLogger, rdb)
 
 	// constructing router config ( dependencies )
 	routerConfig := router.RouterConfig{
