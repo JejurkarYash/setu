@@ -77,7 +77,7 @@ func (h *Handler) CreateUser(w http.ResponseWriter, r *http.Request) {
 	// development testing
 	var googleID, email, name, avtarURL string
 	if os.Getenv("ENV") == "development" && req.IDToken == "mock_token" {
-
+		
 		googleID = "google_user_mock_123"
 		email = "runeshkakad@gmail.com"
 		name = "Runesh Kakad"

@@ -83,6 +83,11 @@ func (h *Handler) CreateProject(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// attach context to logger
+	logger := h.logger.With(
+		slog.String("user_id", userID),
+	)
+
 	parms := dbgen.CreateProjectParams{
 		Name:          req.Name,
 		MonthlyBudget: req.Budget,
@@ -95,15 +100,17 @@ func (h *Handler) CreateProject(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		if errors.As(err, &pgErr) {
 			if pgErr.Code == "23505" { // -> if project already exist
+				logger.Warn("project creation failed: project already exist")
 				utils.WriteError(w, http.StatusConflict, "record already exist!")
 				return
 			}
 		}
-		h.logger.Error("failed to create project", slog.Any("err", err))
+		logger.Error("failed to create project", slog.Any("err", err))
 		utils.WriteError(w, http.StatusInternalServerError, "failed to create project")
 		return
 	}
 
+	logger.Info("project created successfully")
 	utils.WriteJSON(w, http.StatusOK, project)
 	return
 }
@@ -116,14 +123,20 @@ func (h *Handler) ListProjects(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// attach context to logger
+	logger := h.logger.With(
+		slog.String("user_id", userID),
+	)
+
 	// getting projects from db
 	projects, err := h.db.Queries.ListProjectsByUserID(r.Context(), userID)
 	if err != nil {
-		h.logger.Error("failed to fetch project", slog.Any("err", err))
+		logger.Error("failed to fetch project", slog.Any("err", err))
 		utils.WriteError(w, http.StatusInternalServerError, "failed to fetch project")
 		return
 	}
 
+	logger.Info("projects list successfully")
 	utils.WriteJSON(w, http.StatusOK, ListProjectsResponse{Projects: projects})
 	return
 }
@@ -136,12 +149,25 @@ func (h *Handler) GetProjectByID(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	userID, ok := middleware.GetUserID(r.Context())
+	if !ok {
+		utils.WriteError(w, http.StatusUnauthorized, "invalid token")
+		return
+	}
+
+	logger := h.logger.With(
+		slog.String("user_id", userID),
+		slog.String("project_id", projectID),
+	)
+
 	// fetching project from db
 	project, err := h.db.Queries.GetProjectByID(r.Context(), projectID)
 	var pgErr *pgconn.PgError
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			utils.WriteError(w, http.StatusNotFound, "record not found")
+
+			logger.Warn("failed to fetch project: project not found")
+			utils.WriteError(w, http.StatusNotFound, "project not found")
 			return
 		}
 
@@ -157,6 +183,7 @@ func (h *Handler) GetProjectByID(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	logger.Info("project fetched successfully")
 	utils.WriteJSON(w, http.StatusOK, project)
 	return
 
@@ -176,6 +203,11 @@ func (h *Handler) UpdateProject(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	logger := h.logger.With(
+		slog.String("user_id", userID),
+		slog.String("project_id", projectID),
+	)
+
 	var req UpdateProjectRequest
 	err := utils.ReadJSON(r, &req)
 	if err != nil {
@@ -187,14 +219,16 @@ func (h *Handler) UpdateProject(w http.ResponseWriter, r *http.Request) {
 	existingProject, err := h.db.Queries.GetProjectByID(r.Context(), projectID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
+			logger.Warn("failed to update project: project not found")
 			utils.WriteError(w, http.StatusNotFound, "project not found")
 			return
 		}
-		h.logger.Error("failed to fetch the project", slog.Any("err", err))
-		utils.WriteError(w, http.StatusInternalServerError, "failed to fetch project")
+		logger.Error("failed to update project", slog.Any("err", err))
+		utils.WriteError(w, http.StatusInternalServerError, "failed to update project")
 		return
 	}
 	if existingProject.UserID != userID {
+		logger.Warn("unauthorized attempt to update project", slog.String("owner_id", existingProject.ID))
 		utils.WriteError(w, http.StatusForbidden, "you do not have permission to update this project")
 		return
 	}
@@ -219,11 +253,13 @@ func (h *Handler) UpdateProject(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		if errors.As(err, &pgErr) {
 			if pgErr.Code == "23505" {
+				logger.Warn("failed to update project: project name conflict")
 				utils.WriteError(w, http.StatusConflict, "project with this name already exist")
 				return
 			}
 		}
-		h.logger.Error("failed to update the project", slog.Any("err", err))
+
+		logger.Error("failed to update the project", slog.Any("err", err))
 		utils.WriteError(w, http.StatusInternalServerError, "failed to update the project")
 		return
 	}
@@ -233,16 +269,17 @@ func (h *Handler) UpdateProject(w http.ResponseWriter, r *http.Request) {
 		// call api key to get hash
 		keyHash, err := h.db.Queries.GetKeyHashFromProjectID(r.Context(), projectID)
 		if err != nil {
-			h.logger.Warn("(cache invalidation):failed to fetch key hash from db", slog.String("project_id", projectID))
+			logger.Warn("(cache invalidation):failed to fetch key hash from db")
 		}
 
 		// metadata
 		err = h.rdb.DeleteKeyMetadata(r.Context(), keyHash)
 		if err != nil {
-			h.logger.Warn("(cache invalidation):failed to delete keyMetadata from redis", slog.String("project_id", projectID))
+			logger.Warn("(cache invalidation):failed to delete keyMetadata from redis")
 		}
 	}
 
+	logger.Info("project updated successfully")
 	utils.WriteJSON(w, http.StatusOK, UpdateProjectResponse{Project: project})
 	return
 }
@@ -262,21 +299,28 @@ func (h *Handler) ResetMonthlyBudgetUsage(w http.ResponseWriter, r *http.Request
 		return
 	}
 
+	logger := h.logger.With(
+		slog.String("user_id", userID),
+		slog.String("project_id", projectID),
+	)
+
 	// checking if this project is belongs to this user
 	project, err := h.db.Queries.GetProjectByID(r.Context(), projectID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) { // that means no project found with tihs
+			logger.Error("failed to reset budget: project not found", slog.Any("err", err))
 			utils.WriteError(w, http.StatusForbidden, "project not found")
 			return
 		}
 
-		h.logger.Error("failed to fetch projec", slog.Any("err", err))
+		logger.Error("failed to reset budget ", slog.Any("err", err))
 		utils.WriteError(w, http.StatusInternalServerError, "failed to fetch project")
 		return
 	}
 
 	// safty check
 	if project.UserID != userID {
+		logger.Warn("unauthorized attempt to reset budget", slog.String("owner_id", project.ID))
 		utils.WriteError(w, http.StatusForbidden, "you don't have access to this project")
 		return
 	}
@@ -287,16 +331,18 @@ func (h *Handler) ResetMonthlyBudgetUsage(w http.ResponseWriter, r *http.Request
 		Spend: 0.00,
 	})
 	if err != nil {
-		h.logger.Error("failed to update spend into db", slog.Any("err", err))
+		logger.Error("failed to update spend into db", slog.Any("err", err))
 		utils.WriteError(w, http.StatusInternalServerError, "failed to update usage database")
 		return
 	}
 
+	// redis operation
 	if err := h.rdb.ResetSpend(r.Context(), projectID); err != nil {
 		// Log error, but don't fail response since PostgreSQL update succeeded
-		h.logger.Warn("failed to reset spend cache in redis", slog.String("project_id", projectID), slog.Any("error", err))
+		logger.Warn("failed to reset spend cache in redis", slog.Any("error", err))
 	}
 
+	logger.Info("budget reset succesfully")
 	utils.WriteJSON(w, http.StatusOK, map[string]string{
 		"message": "Successfully reset monthly usage",
 	})
