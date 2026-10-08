@@ -79,7 +79,7 @@ func main() {
 	if err != nil {
 		appLogger.Error("failed to init redis", slog.Any("err", err))
 	} else {
-		appLogger.Debug("redis is connected...")
+		appLogger.Info("redis is connected...")
 	}
 
 	// batcher ( for processing events )  -> also spin 5 background goroutines to process events
@@ -89,7 +89,6 @@ func main() {
 	encryptor, _ := utils.NewEncryptor(config.Encryption.MasterKey)
 	// middleware init
 	middleware := middleware.NewMiddleware(db, rdb, appLogger, encryptor)
-
 
 	// LLM Provider Handlers
 	geminiHandler := gemini.NewHandler(config, appLogger, rdb, db, batcher)
@@ -128,16 +127,33 @@ func main() {
 
 	// listeing to os signals for interuptions
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-
 	<-ctx.Done()
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
-	if err := server.Stop(ctx); err != nil {
+	stop() // Realase OS signal resource
+
+	// 10 sec deadline for shuttind down server
+	shutDownCtx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+	defer cancel()
+
+	// shutting down server
+	if err := server.Stop(shutDownCtx); err != nil {
 		log.Fatal("failed to shutdown the server")
-
+		appLogger.Error("failed to shutdown HTTP Server cleanly", slog.Any("err", err))
 	}
-	stop()
-	cancel()
 
-	appLogger.Info("server exited properly")
+	// closing batcher
+	batcher.Close()
+	appLogger.Info("telemetry batcher flushed remaining logs and stopped")
+
+	// closing db
+	db.Close()
+	appLogger.Info("database pool closed")
+
+	// clossing redis
+	if err := rdb.Close(); err != nil {
+		appLogger.Error("failed to close redis connection", slog.Any("err", err))
+	} else {
+		appLogger.Info("redis connection closed")
+	}
+	appLogger.Info("server exited cleanly")
 
 }

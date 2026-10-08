@@ -22,7 +22,6 @@ type KeyMetadata struct {
 // constructor function
 func NewClient(addr string) (*Client, error) {
 
-	fmt.Println("Addr:", addr)
 
 	rdb := redis.NewClient(&redis.Options{
 		Addr: addr,
@@ -65,7 +64,6 @@ func (c *Client) ResetSpend(ctx context.Context, projectID string) error {
 	currMonth := time.Now().UTC().Format("2006-01")
 	key := fmt.Sprintf("project:%s:spend:%s", projectID, currMonth)
 	return c.rdb.Del(ctx, key).Err()
-
 }
 
 // auth middleware methods
@@ -104,4 +102,9 @@ func (c *Client) DeleteKeyMetadata(ctx context.Context, hashedKey string) error 
 
 	key := "api_key:" + hashedKey
 	return c.rdb.Del(ctx, key).Err()
+}
+
+// method for closing redis instance
+func (c *Client) Close() error {
+	return c.rdb.Close()
 }

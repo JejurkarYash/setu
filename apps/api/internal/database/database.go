@@ -67,7 +67,7 @@ func New(cfg *config.Config, logger *slog.Logger) (*Database, error) {
 
 	}
 
-	logger.Debug("PostgreSQL connection pool initialized succesfully")
+	logger.Info("PostgreSQL connection pool initialized succesfully")
 
 	db := &Database{
 		pool:    pool,
@@ -86,7 +86,7 @@ func New(cfg *config.Config, logger *slog.Logger) (*Database, error) {
 
 func (db *Database) RunMigrations() error {
 
-	db.logger.Debug("Running database migrations...")
+	db.logger.Info("Running database migrations...")
 
 	// goose reqquires a database/sql connection
 	// opening temproary connection
@@ -114,7 +114,7 @@ func (db *Database) RunMigrations() error {
 // method to handle graceful shutdown
 func (db *Database) Close() {
 	if db.pool != nil {
-		db.logger.Debug("PostgreSQL is closing...")
+		db.logger.Info("database pool closing...")
 		db.pool.Close()
 	}
 

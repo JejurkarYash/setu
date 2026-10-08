@@ -3,6 +3,7 @@ package telemetry
 import (
 	"context"
 	"log/slog"
+	"sync"
 	"time"
 
 	"github.com/JejurkarYash/setu/internal/database"
@@ -23,6 +24,7 @@ type Batcher struct {
 	db     *database.Database
 	logger *slog.Logger
 	ch     chan BatcherEvent
+	wg     sync.WaitGroup
 }
 
 func NewBatcher(db *database.Database, logger *slog.Logger, bufferSize int, workerPool int) *Batcher {
@@ -35,6 +37,7 @@ func NewBatcher(db *database.Database, logger *slog.Logger, bufferSize int, work
 
 	// run worker's in background ( spawn into background )
 	for i := 0; i < workerPool; i++ {
+		b.wg.Add(1) // added waitgroup
 		go b.startWorker()
 	}
 
@@ -44,6 +47,8 @@ func NewBatcher(db *database.Database, logger *slog.Logger, bufferSize int, work
 
 // worker
 func (b *Batcher) startWorker() {
+	defer b.wg.Done()
+
 	for event := range b.ch { // -> listen to channel and pick the events one by one
 
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -90,4 +95,10 @@ func (b *Batcher) Enqueue(event BatcherEvent) {
 	default:
 		b.logger.Warn("usage event buffer full, dropping telemetry log", slog.String("project_id", event.ProjectID))
 	}
+}
+
+// closing channel
+func (b *Batcher) Close() {
+	close(b.ch)
+	b.wg.Wait()
 }

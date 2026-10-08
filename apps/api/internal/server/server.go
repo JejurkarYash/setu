@@ -39,7 +39,7 @@ func (s *Server) Start() error {
 	if s.httpServer == nil {
 		return fmt.Errorf("router is not initializedß")
 	}
-	s.Logger.Debug("HTTP Server starting..", slog.Any("port:", s.Config.Server.Port))
+	s.Logger.Info("HTTP Server starting..", slog.Any("port:", s.Config.Server.Port))
 	return s.httpServer.ListenAndServe()
 }
 
@@ -48,14 +48,10 @@ func (s *Server) Stop(ctx context.Context) error {
 	if s.httpServer == nil {
 		return errors.New("HTTP Server is not initialized")
 	}
-
-	// clost the db first
-	s.dbPool.Close()
 	// clossing the server finally
-
 	if err := s.httpServer.Shutdown(ctx); err != nil {
 		return fmt.Errorf("failed to stop the HTTP Server:%w", err)
 	}
-	s.Logger.Debug("shutting down the server...")
+	s.Logger.Info("shutting down the server...")
 	return nil
 }
