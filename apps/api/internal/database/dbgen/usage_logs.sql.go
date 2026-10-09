@@ -26,7 +26,7 @@ DELETE FROM usage_logs
 WHERE project_id = $1
 `
 
-func (q *Queries) DeleteUsageLogsByProject(ctx context.Context, projectID pgtype.UUID) error {
+func (q *Queries) DeleteUsageLogsByProject(ctx context.Context, projectID string) error {
 	_, err := q.db.Exec(ctx, deleteUsageLogsByProject, projectID)
 	return err
 }
@@ -37,7 +37,7 @@ FROM usage_logs
 WHERE project_id = $1
 `
 
-func (q *Queries) GetTotalCostByProject(ctx context.Context, projectID pgtype.UUID) (float64, error) {
+func (q *Queries) GetTotalCostByProject(ctx context.Context, projectID string) (float64, error) {
 	row := q.db.QueryRow(ctx, getTotalCostByProject, projectID)
 	var total_cost float64
 	err := row.Scan(&total_cost)
@@ -53,7 +53,7 @@ WHERE project_id = $1
 `
 
 type GetTotalCostByProjectInRangeParams struct {
-	ProjectID   pgtype.UUID
+	ProjectID   string
 	CreatedAt   pgtype.Timestamptz
 	CreatedAt_2 pgtype.Timestamptz
 }
@@ -107,7 +107,7 @@ type GetUsageSummaryByModelRow struct {
 	TotalCost             float64
 }
 
-func (q *Queries) GetUsageSummaryByModel(ctx context.Context, projectID pgtype.UUID) ([]GetUsageSummaryByModelRow, error) {
+func (q *Queries) GetUsageSummaryByModel(ctx context.Context, projectID string) ([]GetUsageSummaryByModelRow, error) {
 	rows, err := q.db.Query(ctx, getUsageSummaryByModel, projectID)
 	if err != nil {
 		return nil, err
@@ -140,7 +140,7 @@ RETURNING id, project_id, model, prompt_tokens, completion_tokens, cost_usd, sta
 `
 
 type InsertUsageLogParams struct {
-	ProjectID        pgtype.UUID
+	ProjectID        string
 	Model            string
 	PromptTokens     int32
 	CompletionTokens int32
@@ -179,7 +179,7 @@ LIMIT $2 OFFSET $3
 `
 
 type ListUsageLogsByProjectParams struct {
-	ProjectID pgtype.UUID
+	ProjectID string
 	Limit     int32
 	Offset    int32
 }
@@ -221,7 +221,7 @@ LIMIT $3 OFFSET $4
 `
 
 type ListUsageLogsByProjectAndModelParams struct {
-	ProjectID pgtype.UUID
+	ProjectID string
 	Model     string
 	Limit     int32
 	Offset    int32
@@ -270,7 +270,7 @@ ORDER BY created_at DESC
 `
 
 type ListUsageLogsByProjectInRangeParams struct {
-	ProjectID   pgtype.UUID
+	ProjectID   string
 	CreatedAt   pgtype.Timestamptz
 	CreatedAt_2 pgtype.Timestamptz
 }

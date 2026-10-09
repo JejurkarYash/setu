@@ -157,6 +157,34 @@ func (q *Queries) ListProjectsByUserID(ctx context.Context, userID string) ([]Pr
 	return items, nil
 }
 
+const resetSpend = `-- name: ResetSpend :one
+UPDATE projects
+SET spend =  $1,
+    updated_at = NOW()
+WHERE id = $2
+RETURNING id, name, user_id, monthly_budget, created_at, updated_at, spend
+`
+
+type ResetSpendParams struct {
+	Spend float64
+	ID    string
+}
+
+func (q *Queries) ResetSpend(ctx context.Context, arg ResetSpendParams) (Project, error) {
+	row := q.db.QueryRow(ctx, resetSpend, arg.Spend, arg.ID)
+	var i Project
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.UserID,
+		&i.MonthlyBudget,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.Spend,
+	)
+	return i, err
+}
+
 const updateProject = `-- name: UpdateProject :one
 UPDATE projects
 SET name = $2, monthly_budget = $3, updated_at = NOW()

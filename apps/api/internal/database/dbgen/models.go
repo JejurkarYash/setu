@@ -10,11 +10,11 @@ import (
 
 type AlertSetting struct {
 	ID                  string
-	ProjectID           pgtype.UUID
+	ProjectID           string
 	SlackWebhookUrl     pgtype.Text
 	EmailNotification   pgtype.Text
-	TriggerThresholdPct pgtype.Int4
-	IsTriggered         pgtype.Bool
+	TriggerThresholdPct int32
+	IsTriggered         bool
 }
 
 type ApiKey struct {
@@ -33,8 +33,8 @@ type ModelRate struct {
 	ID                     string
 	Provider               string
 	ModelName              string
-	PromptTokenCostUsd     pgtype.Numeric
-	CompletionTokenCostUsd pgtype.Numeric
+	PromptTokenCostUsd     float64
+	CompletionTokenCostUsd float64
 	UpdatedAt              pgtype.Timestamptz
 }
 
@@ -61,7 +61,7 @@ type ProviderKey struct {
 
 type UsageLog struct {
 	ID               string
-	ProjectID        pgtype.UUID
+	ProjectID        string
 	Model            string
 	PromptTokens     int32
 	CompletionTokens int32

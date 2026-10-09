@@ -62,7 +62,7 @@ func (b *Batcher) startWorker() {
 
 		// Audit logs entry
 		_, err := b.db.Queries.InsertUsageLog(ctx, dbgen.InsertUsageLogParams{
-			ProjectID:        projectUUID,
+			ProjectID:        event.ProjectID,
 			Model:            event.Model,
 			PromptTokens:     int32(event.InputToken),
 			CompletionTokens: int32(event.OutputToken),
@@ -72,7 +72,7 @@ func (b *Batcher) startWorker() {
 		if err != nil {
 			b.logger.Error("failed to insert logs", slog.Any("err", err))
 		}
-		
+
 		// update spend into db
 		_, err = b.db.Queries.UpdateSpendDB(ctx, dbgen.UpdateSpendDBParams{
 			Spend: event.TotalCost,

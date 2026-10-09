@@ -192,7 +192,7 @@ func (m *Middleware) AuthenticateLLM(next http.Handler) http.Handler {
 			}
 
 			_, err := m.db.Queries.InsertUsageLog(r.Context(), dbgen.InsertUsageLogParams{
-				ProjectID:        projectUUID,
+				ProjectID:        projectID,
 				Model:            "blocked",
 				CompletionTokens: 0,
 				PromptTokens:     0,

@@ -85,12 +85,15 @@ func (h *Handler) Routes() chi.Router {
 	r := chi.NewRouter()
 
 	// registering routes
+	// project routes
 	r.Post("/", h.CreateProject)
 	r.Get("/", h.ListProjects)
 	r.Get("/{id}", h.GetProjectByID)
 	r.Patch("/{id}", h.UpdateProject)
 	r.Post("/{id}/reset-budget", h.ResetMonthlyBudgetUsage)
 	r.Delete("/{id}", h.DeleteProject)
+
+	//
 
 	return r
 
@@ -470,9 +473,9 @@ func (h *Handler) ResetMonthlyBudgetUsage(w http.ResponseWriter, r *http.Request
 	}
 
 	// reseting  spend into db
-	_, err = h.db.Queries.UpdateSpendDB(r.Context(), dbgen.UpdateSpendDBParams{
+	_, err = h.db.Queries.ResetSpend(r.Context(), dbgen.ResetSpendParams{
 		ID:    projectID,
-		Spend: 0.00,
+		Spend: 0.0000000000,
 	})
 	if err != nil {
 		logger.Error("failed to update spend into db", slog.Any("err", err))
