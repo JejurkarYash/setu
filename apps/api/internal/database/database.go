@@ -23,7 +23,7 @@ import (
 var embeddedMigrations embed.FS
 
 type Database struct {
-	pool    *pgxpool.Pool
+	Pool    *pgxpool.Pool
 	logger  *slog.Logger
 	dsn     string
 	Queries *dbgen.Queries
@@ -70,7 +70,7 @@ func New(cfg *config.Config, logger *slog.Logger) (*Database, error) {
 	logger.Info("PostgreSQL connection pool initialized succesfully")
 
 	db := &Database{
-		pool:    pool,
+		Pool:    pool,
 		logger:  logger,
 		dsn:     dsn,
 		Queries: dbgen.New(pool),
@@ -113,9 +113,9 @@ func (db *Database) RunMigrations() error {
 
 // method to handle graceful shutdown
 func (db *Database) Close() {
-	if db.pool != nil {
+	if db.Pool != nil {
 		db.logger.Info("database pool closing...")
-		db.pool.Close()
+		db.Pool.Close()
 	}
 
 }

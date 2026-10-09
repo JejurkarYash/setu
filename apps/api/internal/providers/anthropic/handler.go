@@ -77,8 +77,13 @@ func (h *Handler) handleProxyRequest(w http.ResponseWriter, r *http.Request) {
 	h.logger.Debug("Anthropic Request hit")
 	// getting the model name from request body
 	// reading all bytes from request body
-	bodyBytes, _ := io.ReadAll(r.Body)
+	bodyBytes, err := io.ReadAll(r.Body)
+	if err != nil {
+		h.logger.Error("failed to read body:", slog.Any("err", err.Error()))
+		return
+	}
 
+	h.logger.Debug("body:", slog.String(":", string(bodyBytes)))
 	// setting request body again
 	r.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
 

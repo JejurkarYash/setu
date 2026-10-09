@@ -66,3 +66,10 @@ func (e *Encryptor) Decrypt(ciphertext, nonce []byte) (string, error) {
 	//  Cast bytes back into human-readable string
 	return string(plainBytes), nil
 }
+
+
+
+
+
+
+

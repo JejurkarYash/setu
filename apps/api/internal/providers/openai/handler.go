@@ -74,20 +74,25 @@ func (h *Handler) Routes() chi.Router {
 
 func (h *Handler) handleProxyRequest(w http.ResponseWriter, r *http.Request) {
 
-	// extracting modelname and injecting it in request context
+	bodyBytes, err := io.ReadAll(r.Body)
+	if err != nil {
+		h.logger.Error("failed to read body:", err)
+		return
+	}
 
-	//  Read the bytes into memory
-	bodyBytes, _ := io.ReadAll(r.Body)
+	// Put body back
+	r.Body = io.NopCloser(bytes.NewReader(bodyBytes))
 
-	// put the bytes back into request body
-	r.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
+	var reqModel OpenAIModelName
 
-	// read the model name from read bytes of memory
-	var modelName OpenAIModelName
-	_ = json.Unmarshal(bodyBytes, &modelName)
+	err = json.Unmarshal(bodyBytes, &reqModel)
+	if err != nil {
+		h.logger.Error("unmarshal error:", err)
+		return
+	}
 
-	// setting modelName into ctx (as string)
-	ctx := context.WithValue(r.Context(), "modelName", modelName.Model)
+	//  put  modelName into context
+	ctx := context.WithValue(r.Context(), "modelName", reqModel.Model)
 	r = r.WithContext(ctx)
 
 	h.proxy.ServeHTTP(w, r)

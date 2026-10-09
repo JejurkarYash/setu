@@ -1,6 +1,8 @@
 package project
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"log/slog"
 	"net/http"
@@ -16,14 +18,44 @@ import (
 )
 
 type Handler struct {
-	db     *database.Database
-	logger *slog.Logger
-	rdb    *redis.Client
+	db        *database.Database
+	logger    *slog.Logger
+	rdb       *redis.Client
+	encryptor *utils.Encryptor
 }
 
 type CreateProjectRequest struct {
-	Name   string  `json:"name"`
-	Budget float64 `json:"monthly_budget"`
+	Name        string   `json:"name"`
+	Budget      float64  `json:"monthly_budget"`
+	Provider    provider `json:"provider"`
+	ProviderKey string   `json:"provider_key"`
+}
+
+type provider string
+
+const (
+	ProviderOpenAI    provider = "openai"
+	ProviderAnthropic provider = "anthropic"
+	ProviderGemini    provider = "gemini"
+)
+
+// validating method
+func (p provider) IsValid() bool {
+	switch p {
+	case ProviderAnthropic, ProviderGemini, ProviderOpenAI:
+		return true
+	default:
+		return false
+	}
+}
+
+type CreateProjectResponse struct {
+	Id        string  `json:"id"`
+	Name      string  `json:"name"`
+	Budget    float64 `json:"monthly_budget"`
+	Provider  string  `json:"provider"`
+	ApiKey    string  `json:"api_key"`
+	KeyPrefix string  `json:"key_prefix"`
 }
 
 type ListProjectsResponse struct {
@@ -39,11 +71,12 @@ type UpdateProjectRequest struct {
 	Budget float64 `json:"monthly_budget"`
 }
 
-func NewHandler(db *database.Database, logger *slog.Logger, rdb *redis.Client) *Handler {
+func NewHandler(db *database.Database, logger *slog.Logger, rdb *redis.Client, encryptor *utils.Encryptor) *Handler {
 	return &Handler{
-		db:     db,
-		logger: logger,
-		rdb:    rdb,
+		db:        db,
+		logger:    logger,
+		rdb:       rdb,
+		encryptor: encryptor,
 	}
 }
 
@@ -72,47 +105,158 @@ func (h *Handler) CreateProject(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if req.Budget == 0 || req.Name == "" {
-		utils.WriteError(w, http.StatusBadRequest, "name and budget required")
+	// validating request fields
+	if req.Budget == 0 || req.Name == "" || req.Provider == "" || req.ProviderKey == "" {
+		utils.WriteError(w, http.StatusBadRequest, "fields are required")
 		return
 	}
 
+	// validating provider name
+	if !req.Provider.IsValid() {
+		utils.WriteError(w, http.StatusBadRequest, "Invalid provider")
+		return
+	}
+
+	// getting userID
 	userID, ok := middleware.GetUserID(r.Context())
 	if !ok {
 		utils.WriteError(w, http.StatusUnauthorized, "invalid token")
 		return
 	}
 
-	// attach context to logger
 	logger := h.logger.With(
 		slog.String("user_id", userID),
 	)
 
-	parms := dbgen.CreateProjectParams{
+	ctx := r.Context()
+
+	// START TRANSACTION
+	tx, err := h.db.Pool.Begin(ctx)
+	if err != nil {
+		logger.Error("failed to begin transaction", slog.Any("err", err))
+		utils.WriteError(w, http.StatusInternalServerError, "failed to create project")
+		return
+	}
+
+	// If anything below returns, rollback.
+	defer tx.Rollback(ctx)
+
+	// Create sqlc queries using transaction
+	q := h.db.Queries.WithTx(tx)
+
+	// CREATE PROJECT
+
+	params := dbgen.CreateProjectParams{
 		Name:          req.Name,
 		MonthlyBudget: req.Budget,
 		UserID:        userID,
 	}
 
-	// storing in DB
-	project, err := h.db.Queries.CreateProject(r.Context(), parms)
-	var pgErr *pgconn.PgError
+	project, err := q.CreateProject(ctx, params)
 	if err != nil {
+		var pgErr *pgconn.PgError
+
 		if errors.As(err, &pgErr) {
-			if pgErr.Code == "23505" { // -> if project already exist
-				logger.Warn("project creation failed: project already exist")
-				utils.WriteError(w, http.StatusConflict, "record already exist!")
+			if pgErr.Code == "23505" {
+				logger.Warn("project creation failed: project already exists")
+				utils.WriteError(w, http.StatusConflict, "record already exists")
 				return
 			}
 		}
+
 		logger.Error("failed to create project", slog.Any("err", err))
 		utils.WriteError(w, http.StatusInternalServerError, "failed to create project")
 		return
 	}
 
+	//  ENCRYPT + CREATE PROVIDER KEY
+
+	cipherText, nonce, err := h.encryptor.Encrypt(req.ProviderKey)
+	if err != nil {
+		logger.Error(
+			"failed to encrypt provider key",
+			slog.Any("err", err),
+		)
+
+		utils.WriteError(w, http.StatusInternalServerError, "failed to create project")
+		return
+	}
+
+	_, err = q.CreateProviderKey(ctx, dbgen.CreateProviderKeyParams{
+		ProjectID:    project.ID,
+		Provider:     string(req.Provider),
+		EncryptedKey: cipherText,
+		Nonce:        nonce,
+	})
+
+	if err != nil {
+		logger.Error(
+			"failed to create provider key",
+			slog.Any("err", err),
+		)
+
+		utils.WriteError(w, http.StatusInternalServerError, "failed to create project")
+		return
+	}
+
+	//  GENERATE SETU API KEY
+
+	apiKey, err := utils.GenerateAPIKey()
+	if err != nil {
+		logger.Error(
+			"failed to generate api key",
+			slog.Any("err", err),
+		)
+
+		utils.WriteError(w, http.StatusInternalServerError, "failed to create project")
+		return
+	}
+
+	// Hash API key before storing
+	hash := sha256.Sum256([]byte(apiKey))
+	hashedKey := hex.EncodeToString(hash[:])
+
+	//  STORE API KEY HASH
+
+	_, err = q.CreateApiKey(ctx, dbgen.CreateApiKeyParams{
+		ProjectID: project.ID,
+		KeyHash:   hashedKey,
+		KeyPrefix: apiKey[:13],
+	})
+
+	if err != nil {
+		logger.Error(
+			"failed to create api key",
+			slog.Any("err", err),
+		)
+
+		utils.WriteError(w, http.StatusInternalServerError, "failed to create project")
+		return
+	}
+
+	//  COMMIT
+
+	if err := tx.Commit(ctx); err != nil {
+		logger.Error(
+			"failed to commit project creation",
+			slog.Any("err", err),
+		)
+
+		utils.WriteError(w, http.StatusInternalServerError, "failed to create project")
+		return
+	}
+
 	logger.Info("project created successfully")
-	utils.WriteJSON(w, http.StatusOK, project)
-	return
+
+	// Return the plaintext API key ONCE
+	utils.WriteJSON(w, http.StatusCreated, CreateProjectResponse{
+		Id:        project.ID,
+		Name:      project.Name,
+		Budget:    project.MonthlyBudget,
+		Provider:  string(req.Provider),
+		ApiKey:    apiKey,
+		KeyPrefix: apiKey[:13],
+	})
 }
 
 func (h *Handler) ListProjects(w http.ResponseWriter, r *http.Request) {

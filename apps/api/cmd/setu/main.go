@@ -97,7 +97,7 @@ func main() {
 
 	// NON-LLM Handlers
 	userHandler := users.NewHandler(db, appLogger)
-	projectHandler := project.NewHandler(db, appLogger, rdb)
+	projectHandler := project.NewHandler(db, appLogger, rdb, encryptor)
 
 	// constructing router config ( dependencies )
 	routerConfig := router.RouterConfig{

@@ -72,7 +72,7 @@ func (b *Batcher) startWorker() {
 		if err != nil {
 			b.logger.Error("failed to insert logs", slog.Any("err", err))
 		}
-
+		
 		// update spend into db
 		_, err = b.db.Queries.UpdateSpendDB(ctx, dbgen.UpdateSpendDBParams{
 			Spend: event.TotalCost,
