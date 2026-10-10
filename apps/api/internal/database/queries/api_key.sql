@@ -24,7 +24,7 @@ ORDER BY created_at DESC;
 UPDATE api_key
 SET is_active = $2, updated_at = NOW()
 WHERE id = $1
-RETURNING *;
+RETURNING *;  
 
 -- name: UpdateApiKeyLastUsed :exec
 UPDATE api_key
@@ -40,3 +40,7 @@ SELECT key_hash
 FROM api_key
 WHERE project_id = $1
   AND is_active = TRUE;
+
+-- name: GetActiveKeyFromProjectID :one 
+SELECT * FROM api_key 
+WHERE project_id = $1 AND is_active = TRUE; 

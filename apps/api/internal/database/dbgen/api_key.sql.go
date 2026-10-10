@@ -56,6 +56,28 @@ func (q *Queries) DeleteApiKey(ctx context.Context, id string) error {
 	return err
 }
 
+const getActiveKeyFromProjectID = `-- name: GetActiveKeyFromProjectID :one
+SELECT id, project_id, key_prefix, key_hash, is_active, expires_at, last_used_at, created_at, updated_at FROM api_key 
+WHERE project_id = $1 AND is_active = TRUE
+`
+
+func (q *Queries) GetActiveKeyFromProjectID(ctx context.Context, projectID string) (ApiKey, error) {
+	row := q.db.QueryRow(ctx, getActiveKeyFromProjectID, projectID)
+	var i ApiKey
+	err := row.Scan(
+		&i.ID,
+		&i.ProjectID,
+		&i.KeyPrefix,
+		&i.KeyHash,
+		&i.IsActive,
+		&i.ExpiresAt,
+		&i.LastUsedAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const getActiveKeyMetadata = `-- name: GetActiveKeyMetadata :one
 SELECT 
     api_key.project_id,

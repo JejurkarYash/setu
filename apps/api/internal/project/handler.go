@@ -93,7 +93,8 @@ func (h *Handler) Routes() chi.Router {
 	r.Post("/{id}/reset-budget", h.ResetMonthlyBudgetUsage)
 	r.Delete("/{id}", h.DeleteProject)
 
-	//
+	// api key delete
+	r.Post("/key/generate/{id}", h.GenerateNewAPIKEY)
 
 	return r
 
@@ -136,7 +137,7 @@ func (h *Handler) CreateProject(w http.ResponseWriter, r *http.Request) {
 	// START TRANSACTION
 	tx, err := h.db.Pool.Begin(ctx)
 	if err != nil {
-		logger.Error("failed to begin transaction", slog.Any("err", err))
+		logger.Error("failed to create new project: failed to begin new transaction", slog.Any("err", err))
 		utils.WriteError(w, http.StatusInternalServerError, "failed to create project")
 		return
 	}
@@ -495,6 +496,7 @@ func (h *Handler) ResetMonthlyBudgetUsage(w http.ResponseWriter, r *http.Request
 	})
 }
 
+// delete projects
 func (h *Handler) DeleteProject(w http.ResponseWriter, r *http.Request) {
 
 	projectID := chi.URLParam(r, "id")
@@ -546,5 +548,141 @@ func (h *Handler) DeleteProject(w http.ResponseWriter, r *http.Request) {
 	logger.Info("project deleted successfully")
 
 	w.WriteHeader(http.StatusNoContent)
+
+}
+
+// generate new api key for this project
+func (h *Handler) GenerateNewAPIKEY(w http.ResponseWriter, r *http.Request) {
+
+	projectID := chi.URLParam(r, "id")
+	if projectID == "" {
+		utils.WriteError(w, http.StatusBadRequest, "project id is required")
+		return
+	}
+
+	userID, ok := middleware.GetUserID(r.Context())
+	if !ok {
+		utils.WriteError(w, http.StatusUnauthorized, "invalid token")
+		return
+	}
+
+	// attaching context to logger
+	logger := h.logger.With(
+		slog.String("user_id", userID),
+		slog.String("project_id", projectID),
+	)
+
+	// checking ownership
+	project, err := h.db.Queries.GetProjectByID(r.Context(), projectID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			logger.Warn("failed to genrate new key: project not found")
+			utils.WriteError(w, http.StatusNotFound, "project not found")
+			return
+		}
+
+		logger.Error("failed to generate new key", slog.Any("err", err))
+		utils.WriteError(w, http.StatusInternalServerError, "failed to generate new key")
+		return
+	}
+
+	if project.UserID != userID {
+		logger.Warn("unauthorized attempt to generate new api key", slog.String("owner_id", project.ID))
+		utils.WriteError(w, http.StatusForbidden, "you don't have access to this project")
+		return
+	}
+
+	// TRANSACTION
+	tx, err := h.db.Pool.Begin(r.Context())
+	if err != nil {
+		logger.Error("failed to generate new key: failed to begin trnsaction", slog.Any("err", err))
+		utils.WriteError(w, http.StatusInternalServerError, "failed to generate new key")
+		return
+	}
+
+	//  if one of the openration failed then rollback
+	defer tx.Rollback(r.Context())
+
+	q := h.db.Queries.WithTx(tx)
+
+	// get the active key first
+	Oldkey, err := q.GetActiveKeyFromProjectID(r.Context(), projectID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			logger.Warn("failed to generate new api key: key not found")
+			utils.WriteError(w, http.StatusNotFound, "invalid project id")
+			return
+		}
+
+		logger.Error("failed to generate new api key", slog.Any("err", err))
+		utils.WriteError(w, http.StatusInternalServerError, "failed to generate new key")
+		return
+	}
+
+	// inactive first api key before creting new one
+	_, err = q.UpdateApiKeyStatus(r.Context(), dbgen.UpdateApiKeyStatusParams{
+		ID:       Oldkey.ID,
+		IsActive: false,
+	})
+
+	if err != nil {
+		logger.Error("failed to generate new key", slog.Any("err", err))
+		utils.WriteError(w, http.StatusInternalServerError, "failed to generate key")
+		return
+	}
+
+	// GENERATE SETU API KEY
+	rawKey, err := utils.GenerateAPIKey()
+	if err != nil {
+		logger.Error(
+			"failed to generate api key",
+			slog.Any("err", err),
+		)
+
+		utils.WriteError(w, http.StatusInternalServerError, "failed to generate new api key")
+		return
+	}
+
+	// Hash API key before storing
+	hash := sha256.Sum256([]byte(rawKey))
+	hashedKey := hex.EncodeToString(hash[:])
+
+	// store it into db
+	newKey, err := q.CreateApiKey(r.Context(), dbgen.CreateApiKeyParams{
+		ProjectID: projectID,
+		KeyPrefix: rawKey[:13],
+		KeyHash:   hashedKey,
+	})
+	if err != nil {
+		logger.Error("failed to generate key", slog.Any("err", err))
+		utils.WriteError(w, http.StatusInternalServerError, "failed to generate new key")
+		return
+	}
+
+	// commiting transaction
+	if err := tx.Commit(r.Context()); err != nil {
+		logger.Error(
+			"failed to generate api key",
+			slog.Any("err", err),
+		)
+
+		// cache invalidation
+		if err := h.rdb.DeleteKeyMetadata(r.Context(), Oldkey.KeyHash); err != nil {
+			logger.Warn("failed to delete old key metadata from redis", slog.Any("err", err))
+		}
+
+		utils.WriteError(w, http.StatusInternalServerError, "failed to generate api key")
+		return
+	}
+
+	logger.Info("api key generated succesfully")
+
+	// Return the plaintext API key ONCE
+	utils.WriteJSON(w, http.StatusCreated, map[string]string{
+		"id":         projectID,
+		"key_prefix": newKey.KeyPrefix,
+		"api_key":    rawKey,
+	})
+	return
 
 }
