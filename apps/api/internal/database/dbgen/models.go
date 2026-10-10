@@ -60,14 +60,14 @@ type ProviderKey struct {
 }
 
 type UsageLog struct {
-	ID               string
-	ProjectID        string
-	Model            string
-	PromptTokens     int32
-	CompletionTokens int32
-	CostUsd          float64
-	StatusCode       int32
-	CreatedAt        pgtype.Timestamptz
+	ID               string             `json:"id"`
+	ProjectID        string             `json:"project_id"`
+	Model            string             `json:"model"`
+	PromptTokens     int32              `json:"prompt_tokens"`
+	CompletionTokens int32              `json:"completion_token"`
+	CostUsd          float64            `json:"cost_usd"`
+	StatusCode       int32              `json:"status"`
+	CreatedAt        pgtype.Timestamptz `json:"created_at"`
 }
 
 type User struct {

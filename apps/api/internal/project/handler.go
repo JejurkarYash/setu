@@ -6,6 +6,7 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"strconv"
 
 	"github.com/JejurkarYash/setu/internal/database"
 	"github.com/JejurkarYash/setu/internal/database/dbgen"
@@ -85,7 +86,8 @@ func (h *Handler) Routes() chi.Router {
 	r := chi.NewRouter()
 
 	// registering routes
-	// project routes
+
+	// Project Management Routes
 	r.Post("/", h.CreateProject)
 	r.Get("/", h.ListProjects)
 	r.Get("/{id}", h.GetProjectByID)
@@ -93,14 +95,17 @@ func (h *Handler) Routes() chi.Router {
 	r.Post("/{id}/reset-budget", h.ResetMonthlyBudgetUsage)
 	r.Delete("/{id}", h.DeleteProject)
 
-	// api key delete
+	// API Key Routes
 	r.Post("/key/generate/{id}", h.GenerateNewAPIKEY)
+
+	// Analytics & Alert Routes
+	r.Get("/{id}/logs", h.GetUsageLogs)
 
 	return r
 
 }
 
-// handler methods
+// Project Management handler Methods
 func (h *Handler) CreateProject(w http.ResponseWriter, r *http.Request) {
 
 	var req CreateProjectRequest
@@ -432,7 +437,7 @@ func (h *Handler) UpdateProject(w http.ResponseWriter, r *http.Request) {
 	return
 }
 
-// cache Invalidation
+// Project (cache invalidation handler)
 func (h *Handler) ResetMonthlyBudgetUsage(w http.ResponseWriter, r *http.Request) {
 
 	projectID := chi.URLParam(r, "id")
@@ -496,7 +501,6 @@ func (h *Handler) ResetMonthlyBudgetUsage(w http.ResponseWriter, r *http.Request
 	})
 }
 
-// delete projects
 func (h *Handler) DeleteProject(w http.ResponseWriter, r *http.Request) {
 
 	projectID := chi.URLParam(r, "id")
@@ -551,7 +555,7 @@ func (h *Handler) DeleteProject(w http.ResponseWriter, r *http.Request) {
 
 }
 
-// generate new api key for this project
+// API KEY Handler Methods
 func (h *Handler) GenerateNewAPIKEY(w http.ResponseWriter, r *http.Request) {
 
 	projectID := chi.URLParam(r, "id")
@@ -686,3 +690,64 @@ func (h *Handler) GenerateNewAPIKEY(w http.ResponseWriter, r *http.Request) {
 	return
 
 }
+
+// Analytics & Alerts Handler Methods
+func (h *Handler) GetUsageLogs(w http.ResponseWriter, r *http.Request) {
+	projectID := chi.URLParam(r, "id")
+	if projectID == "" {
+		utils.WriteError(w, http.StatusBadRequest, "Bad Request")
+		return
+	}
+
+	userID, ok := middleware.GetUserID(r.Context())
+	if !ok {
+		utils.WriteError(w, http.StatusUnauthorized, "Invalid Token")
+		return
+	}
+	logger := h.logger.With(
+		slog.String("user_id", userID),
+		slog.String("project_id", projectID),
+	)
+
+	// getting limit and offset
+	limitStr := r.URL.Query().Get("limit")
+	offsetStr := r.URL.Query().Get("offset")
+
+	//  default values
+	limit := 20
+	offset := 0
+
+	limit, err := strconv.Atoi(limitStr)
+	if err != nil {
+		limit = 20 // default value
+	}
+
+	offset, err = strconv.Atoi(offsetStr)
+	if err != nil {
+		offset = 0 // default value
+	}
+
+	// fetching logs
+	usageLogs, err := h.db.Queries.ListUsageLogsByProject(r.Context(), dbgen.ListUsageLogsByProjectParams{
+		ProjectID: projectID,
+		Limit:     int32(limit),
+		Offset:    int32(offset),
+	})
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			logger.Warn("failed to fetch project logs: Logs Not Found")
+			utils.WriteError(w, http.StatusNotFound, "No Logs")
+			return
+		}
+		logger.Error("failed to fetch project logs", slog.Any("err", err))
+		utils.WriteError(w, http.StatusInternalServerError, "failed to fetch project logs")
+		return
+	}
+
+	// returning logs
+	utils.WriteJSON(w, http.StatusOK, map[string][]dbgen.UsageLog{
+		"usage_logs": usageLogs,
+	})
+	return
+}
+
