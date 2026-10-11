@@ -495,6 +495,14 @@ func (h *Handler) ResetMonthlyBudgetUsage(w http.ResponseWriter, r *http.Request
 		logger.Warn("failed to reset spend cache in redis", slog.Any("error", err))
 	}
 
+	// reset alert notified
+	err = h.db.Queries.ResetLastNotifiedAt(r.Context(), projectID)
+	if err != nil {
+		logger.Error("failed to update spend into db", slog.Any("err", err))
+		utils.WriteError(w, http.StatusInternalServerError, "failed to udpate usage database")
+		return 
+	}
+
 	logger.Info("budget reset succesfully")
 	utils.WriteJSON(w, http.StatusOK, map[string]string{
 		"message": "Successfully reset monthly usage",
@@ -750,4 +758,3 @@ func (h *Handler) GetUsageLogs(w http.ResponseWriter, r *http.Request) {
 	})
 	return
 }
-

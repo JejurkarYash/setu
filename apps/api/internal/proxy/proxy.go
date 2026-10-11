@@ -18,7 +18,13 @@ type Provider interface {
 	InjectAPI(pr *httputil.ProxyRequest) error                // -> injecting the API
 	Parser(r io.Reader, contentType string) (int, int, error) // -> reading the input and output tokens
 
-	UpdateSpend(ctx context.Context, inputToken, outputToken int) (string, string, float64, error) // -> update the redis counter
+	UpdateSpend(ctx context.Context, inputToken, outputToken int) (*SpendResult, error) // -> update the redis counter
+}
+
+type SpendResult struct {
+	ProjectID string
+	Model     string
+	TotalCost float64
 }
 
 type bodyWrapper struct {
@@ -92,22 +98,24 @@ func (e *Engine) SetupProxyEngine() *httputil.ReverseProxy {
 				inputToken, outputToken, err := e.provider.Parser(pr, contentType) // -> llm specific provider
 				if err != nil {
 					e.Logger.Error("failed to parse tokens", slog.Any("error", err))
+					return
 				}
 
 				// passing this token to calculate or update the redis part
-				projectId, modelName, totalCost, error := e.provider.UpdateSpend(detachedCtx, inputToken, outputToken)
+				spendResult, error := e.provider.UpdateSpend(detachedCtx, inputToken, outputToken)
 
 				if error != nil {
 					e.Logger.Error("failed to get the data from update spend", slog.Any("err", error))
+					return
 				}
 
 				// put this task into -> channel for later proced (usage log & update spend into db)
 				e.batcher.Enqueue(telemetry.BatcherEvent{
-					ProjectID:   projectId,
-					Model:       modelName,
+					ProjectID:   spendResult.ProjectID,
+					Model:       spendResult.Model,
 					InputToken:  inputToken,
 					OutputToken: outputToken,
-					TotalCost:   totalCost,
+					TotalCost:   spendResult.TotalCost,
 					StatusCode:  200,
 				})
 

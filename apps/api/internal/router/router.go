@@ -3,6 +3,7 @@ package router
 import (
 	"net/http"
 
+	"github.com/JejurkarYash/setu/internal/alerts"
 	"github.com/JejurkarYash/setu/internal/middleware"
 	"github.com/JejurkarYash/setu/internal/project"
 	"github.com/JejurkarYash/setu/internal/providers/anthropic"
@@ -19,6 +20,7 @@ type RouterConfig struct {
 	Anthropic      *anthropic.Handler
 	UserHandler    *users.Handler
 	ProjectHandler *project.Handler
+	AlertHandler   *alerts.Handler
 }
 
 func NewRouter(cfg *RouterConfig) *chi.Mux {
@@ -55,7 +57,8 @@ func NewRouter(cfg *RouterConfig) *chi.Mux {
 		// PROTECTED ROUTES (Project)
 		r.Group(func(r chi.Router) {
 			r.Use(cfg.Middleware.AuthenticateJWT)
-			r.Mount("/projects", cfg.ProjectHandler.Routes()) // -> /api/v1/project
+			r.Mount("/projects/alert", cfg.AlertHandler.Routes()) //  -> api/v1/projects/alert
+			r.Mount("/projects", cfg.ProjectHandler.Routes())     // -> /api/v1/project
 		})
 	})
 

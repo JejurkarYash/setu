@@ -117,7 +117,7 @@ func (h *Handler) InjectAPI(pr *httputil.ProxyRequest) error {
 }
 
 // update redis spend
-func (h *Handler) UpdateSpend(ctx context.Context, inputToken, outputToken int) (string, string, float64, error) {
+func (h *Handler) UpdateSpend(ctx context.Context, inputToken, outputToken int) (*proxy.SpendResult, error) {
 	var model string
 	var projectID string
 
@@ -148,10 +148,14 @@ func (h *Handler) UpdateSpend(ctx context.Context, inputToken, outputToken int) 
 
 	if err := h.rdb.IncrSpend(ctx, model, projectID, totalCost); err != nil {
 		h.logger.Error("failed to update redis spend", slog.Any("err", err))
-		return "", "", 0.0, err
+		return nil, err
 	}
 
-	return projectID, model, totalCost, nil
+	return &proxy.SpendResult{
+		ProjectID: projectID,
+		Model:     model,
+		TotalCost: totalCost,
+	}, nil
 }
 
 // parsing the response based on response content type

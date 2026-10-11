@@ -9,12 +9,15 @@ import (
 )
 
 type AlertSetting struct {
-	ID                  string
-	ProjectID           string
-	SlackWebhookUrl     pgtype.Text
-	EmailNotification   pgtype.Text
-	TriggerThresholdPct int32
-	IsTriggered         bool
+	ID                       string
+	ProjectID                string
+	SlackWebhookUrlEncrypted []byte
+	TriggerThresholdPct      int32
+	NotifySlack              bool
+	LastNotifiedAt           pgtype.Timestamptz
+	CreatedAt                pgtype.Timestamptz
+	UpdatedAt                pgtype.Timestamptz
+	SlackWebhookNonce        []byte
 }
 
 type ApiKey struct {
@@ -60,14 +63,14 @@ type ProviderKey struct {
 }
 
 type UsageLog struct {
-	ID               string             `json:"id"`
-	ProjectID        string             `json:"project_id"`
-	Model            string             `json:"model"`
-	PromptTokens     int32              `json:"prompt_tokens"`
-	CompletionTokens int32              `json:"completion_token"`
-	CostUsd          float64            `json:"cost_usd"`
-	StatusCode       int32              `json:"status"`
-	CreatedAt        pgtype.Timestamptz `json:"created_at"`
+	ID               string
+	ProjectID        string
+	Model            string
+	PromptTokens     int32
+	CompletionTokens int32
+	CostUsd          float64
+	StatusCode       int32
+	CreatedAt        pgtype.Timestamptz
 }
 
 type User struct {

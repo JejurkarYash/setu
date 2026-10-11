@@ -12,11 +12,13 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/JejurkarYash/setu/internal/alerts"
 	"github.com/JejurkarYash/setu/internal/config"
 	"github.com/JejurkarYash/setu/internal/database"
 	"github.com/JejurkarYash/setu/internal/lib/utils"
 	"github.com/JejurkarYash/setu/internal/logger"
 	"github.com/JejurkarYash/setu/internal/middleware"
+	"github.com/JejurkarYash/setu/internal/notifier"
 	"github.com/JejurkarYash/setu/internal/project"
 	"github.com/JejurkarYash/setu/internal/providers/anthropic"
 	"github.com/JejurkarYash/setu/internal/providers/gemini"
@@ -82,11 +84,13 @@ func main() {
 		appLogger.Info("redis is connected...")
 	}
 
-	// batcher ( for processing events )  -> also spin 5 background goroutines to process events
-	batcher := telemetry.NewBatcher(db, appLogger, 1000, 5)
-
 	// creating new encrytor
 	encryptor, _ := utils.NewEncryptor(config.Encryption.MasterKey)
+	// notifier for sending alerts
+	notifier := notifier.NewSlackNotifier()
+	// batcher ( for processing events )  -> also spin 5 background goroutines to process events
+	batcher := telemetry.NewBatcher(db, appLogger, 1000, 5, notifier, encryptor)
+
 	// middleware init
 	middleware := middleware.NewMiddleware(db, rdb, appLogger, encryptor)
 
@@ -98,6 +102,7 @@ func main() {
 	// NON-LLM Handlers
 	userHandler := users.NewHandler(db, appLogger)
 	projectHandler := project.NewHandler(db, appLogger, rdb, encryptor)
+	alertHandler := alerts.NewHandler(db, appLogger, encryptor)
 
 	// constructing router config ( dependencies )
 	routerConfig := router.RouterConfig{
@@ -107,6 +112,7 @@ func main() {
 		Anthropic:      anthropicHandler,
 		UserHandler:    userHandler,
 		ProjectHandler: projectHandler,
+		AlertHandler:   alertHandler,
 	}
 
 	router := router.NewRouter(&routerConfig)
