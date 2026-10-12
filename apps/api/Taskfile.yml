@@ -7,3 +7,6 @@ tasks:
   seed:
     cmds:
        - go run ./cmd/seed/main.go
+  seed:models:
+    cmds:
+       - go run ./cmd/seed_models/main.go

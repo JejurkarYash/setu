@@ -15,6 +15,7 @@ import (
 	"github.com/JejurkarYash/setu/internal/lib/utils"
 	"github.com/JejurkarYash/setu/internal/redis"
 	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/shopspring/decimal"
 )
 
 type Middleware struct {
@@ -97,7 +98,7 @@ func (m *Middleware) AuthenticateLLM(next http.Handler) http.Handler {
 		hashedKey := hex.EncodeToString(hash[:])
 
 		var projectID string
-		var budgetLimit float64
+		var budgetLimit decimal.Decimal
 
 		// look in redis
 		metadata, err := m.rdb.GetKeyMetadata(r.Context(), hashedKey)
@@ -135,7 +136,7 @@ func (m *Middleware) AuthenticateLLM(next http.Handler) http.Handler {
 
 			// setting projectID & budgetLimit
 			projectID = dbMeta.ProjectID
-			budgetLimit = dbMeta.BudgetLimit
+			budgetLimit = decimal.NewFromFloat(dbMeta.BudgetLimit)
 
 			// fetching provider key
 			keyRecord, err := m.db.Queries.GetProviderKey(r.Context(), dbgen.GetProviderKeyParams{
@@ -153,7 +154,7 @@ func (m *Middleware) AuthenticateLLM(next http.Handler) http.Handler {
 			// storing in redis
 			cacheMeta := &redis.KeyMetadata{
 				ProjectID:      dbMeta.ProjectID,
-				BudgetLimit:    dbMeta.BudgetLimit,
+				BudgetLimit:    decimal.NewFromFloat(dbMeta.BudgetLimit),
 				ProviderAPIKey: decryptedKey,
 			}
 
@@ -178,12 +179,11 @@ func (m *Middleware) AuthenticateLLM(next http.Handler) http.Handler {
 
 		fmt.Println("cost:", cost)
 
-		if cost > budgetLimit {
+		if cost.GreaterThan(budgetLimit) {
 			//  block the request
-
 			// logging
 			m.logger.Info("request is block", slog.String("projectID", projectID),
-				slog.Float64("budget", budgetLimit), slog.Float64("cost", cost))
+				slog.Any("budget", budgetLimit), slog.Any("cost", cost))
 
 			// Database logging
 			var projectUUID pgtype.UUID
@@ -196,7 +196,7 @@ func (m *Middleware) AuthenticateLLM(next http.Handler) http.Handler {
 				Model:            "blocked",
 				CompletionTokens: 0,
 				PromptTokens:     0,
-				CostUsd:          0,
+				CostUsd:          decimal.Zero,
 				StatusCode:       429,
 			})
 

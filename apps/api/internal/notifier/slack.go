@@ -49,7 +49,7 @@ func (s *SlackNotifier) Send(
 				"Your project has reached its configured budget alert threshold. "+
 				"Review your usage to avoid unexpected costs.",
 			projectName,
-			threshold,
+			int((spend/budget)*100),
 			spend,
 			budget,
 		),

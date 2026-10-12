@@ -7,6 +7,8 @@ package dbgen
 
 import (
 	"context"
+
+	"github.com/shopspring/decimal"
 )
 
 const createProject = `-- name: CreateProject :one
@@ -276,7 +278,7 @@ RETURNING id, name, user_id, monthly_budget, created_at, updated_at, spend
 `
 
 type UpdateSpendDBParams struct {
-	Spend float64
+	Spend decimal.Decimal
 	ID    string
 }
 

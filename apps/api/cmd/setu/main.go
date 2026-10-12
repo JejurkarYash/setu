@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/JejurkarYash/setu/internal/alerts"
+	"github.com/JejurkarYash/setu/internal/billing"
 	"github.com/JejurkarYash/setu/internal/config"
 	"github.com/JejurkarYash/setu/internal/database"
 	"github.com/JejurkarYash/setu/internal/lib/utils"
@@ -94,10 +95,13 @@ func main() {
 	// middleware init
 	middleware := middleware.NewMiddleware(db, rdb, appLogger, encryptor)
 
+	// Billing
+	billing := billing.NewBillingConfig(db, rdb, appLogger)
+
 	// LLM Provider Handlers
-	geminiHandler := gemini.NewHandler(config, appLogger, rdb, db, batcher)
-	openAIHandler := openai.NewHandler(config, appLogger, rdb, db, batcher)
-	anthropicHandler := anthropic.NewHandler(config, appLogger, rdb, db, batcher)
+	geminiHandler := gemini.NewHandler(config, appLogger, rdb, db, batcher, billing)
+	openAIHandler := openai.NewHandler(config, appLogger, rdb, db, batcher, billing)
+	anthropicHandler := anthropic.NewHandler(config, appLogger, rdb, db, batcher, billing)
 
 	// NON-LLM Handlers
 	userHandler := users.NewHandler(db, appLogger)

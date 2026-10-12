@@ -9,6 +9,7 @@ import (
 	"context"
 
 	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/shopspring/decimal"
 )
 
 const deleteUsageLog = `-- name: DeleteUsageLog :exec
@@ -144,7 +145,7 @@ type InsertUsageLogParams struct {
 	Model            string
 	PromptTokens     int32
 	CompletionTokens int32
-	CostUsd          float64
+	CostUsd          decimal.Decimal
 	StatusCode       int32
 }
 

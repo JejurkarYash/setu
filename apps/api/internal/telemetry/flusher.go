@@ -13,6 +13,7 @@ import (
 	"github.com/JejurkarYash/setu/internal/notifier"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/shopspring/decimal"
 )
 
 type BatcherEvent struct {
@@ -20,7 +21,7 @@ type BatcherEvent struct {
 	Model       string
 	InputToken  int
 	OutputToken int
-	TotalCost   float64
+	TotalCost   decimal.Decimal
 	StatusCode  int
 }
 
@@ -80,7 +81,7 @@ func (b *Batcher) startWorker() {
 			PromptTokens:     int32(event.InputToken),
 			CompletionTokens: int32(event.OutputToken),
 			StatusCode:       int32(event.StatusCode),
-			CostUsd:          float64(event.TotalCost),
+			CostUsd:          event.TotalCost,
 		})
 		if err != nil {
 			logger.Error("failed to insert logs", slog.Any("err", err))

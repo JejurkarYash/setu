@@ -10,6 +10,7 @@ import (
 
 	"github.com/JejurkarYash/setu/internal/database"
 	"github.com/JejurkarYash/setu/internal/telemetry"
+	"github.com/shopspring/decimal"
 )
 
 // provider interface
@@ -24,7 +25,7 @@ type Provider interface {
 type SpendResult struct {
 	ProjectID string
 	Model     string
-	TotalCost float64
+	TotalCost decimal.Decimal
 }
 
 type bodyWrapper struct {

@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
@@ -22,10 +23,11 @@ import (
 )
 
 type Handler struct {
-	cfg    *config.Config
-	logger *slog.Logger
-	proxy  *httputil.ReverseProxy
-	rdb    *redis.Client
+	cfg     *config.Config
+	logger  *slog.Logger
+	proxy   *httputil.ReverseProxy
+	rdb     *redis.Client
+	billing *billing.BillingConfig
 }
 
 type AnthropicModelName struct {
@@ -52,11 +54,12 @@ type AnthropicSSEResponse struct {
 	}
 }
 
-func NewHandler(cfg *config.Config, logger *slog.Logger, rdb *redis.Client, db *database.Database, batcher *telemetry.Batcher) *Handler {
+func NewHandler(cfg *config.Config, logger *slog.Logger, rdb *redis.Client, db *database.Database, batcher *telemetry.Batcher, billing *billing.BillingConfig) *Handler {
 	h := &Handler{
-		cfg:    cfg,
-		logger: logger,
-		rdb:    rdb,
+		cfg:     cfg,
+		logger:  logger,
+		rdb:     rdb,
+		billing: billing,
 	}
 
 	// proxy engine init
@@ -136,12 +139,15 @@ func (h *Handler) UpdateSpend(ctx context.Context, inputToken, outputToken int) 
 		model = "claude-fable-5"
 	}
 
-	totalCost := billing.CalculateCost(model, inputToken, outputToken)
+	totalCost, err := h.billing.CalculateCost(ctx, "anthropic", model, inputToken, outputToken)
+	if err != nil {
+		return nil, fmt.Errorf("failed to calculate total cost:%v", err)
+	}
 
 	// loggin for debug
 	h.logger.Info("Calculated request cost",
 		slog.String("model", model),
-		slog.Float64("cost", totalCost),
+		slog.Any("cost", totalCost),
 		slog.Int("input_tokens", inputToken),
 		slog.Int("ouput_tokens", outputToken))
 

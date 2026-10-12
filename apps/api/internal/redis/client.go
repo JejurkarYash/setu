@@ -3,10 +3,12 @@ package redis
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
 	"github.com/redis/go-redis/v9"
+	"github.com/shopspring/decimal"
 )
 
 type Client struct {
@@ -14,14 +16,18 @@ type Client struct {
 }
 
 type KeyMetadata struct {
-	ProjectID      string  `json:"project_id"`
-	BudgetLimit    float64 `json:"budget_limit"`
-	ProviderAPIKey string  `json:"provider_key"`
+	ProjectID      string          `json:"project_id"`
+	BudgetLimit    decimal.Decimal `json:"budget_limit"`
+	ProviderAPIKey string          `json:"provider_key"`
+}
+
+type ModelRates struct {
+	InputCost  decimal.Decimal
+	OutputCost decimal.Decimal
 }
 
 // constructor function
 func NewClient(addr string) (*Client, error) {
-
 
 	rdb := redis.NewClient(&redis.Options{
 		Addr: addr,
@@ -36,27 +42,48 @@ func NewClient(addr string) (*Client, error) {
 	}, nil
 }
 
-// method to increment the spend
-func (c *Client) IncrSpend(ctx context.Context, model, projectID string, amount float64) error {
+const spendScale int32 = 10
+
+func (c *Client) IncrSpend(
+	ctx context.Context,
+	model string,
+	projectID string,
+	amount decimal.Decimal,
+) error {
 	currentMonth := time.Now().UTC().Format("2006-01")
 	key := fmt.Sprintf("project:%s:spend:%s", projectID, currentMonth)
-	return c.rdb.IncrByFloat(ctx, key, amount).Err()
+
+	// Convert USD to integer units of 10^-10 dollars.
+	scaledAmount := amount.Shift(spendScale)
+
+	// Reject values that cannot be represented exactly at this scale.
+	if !scaledAmount.Equal(scaledAmount.Truncate(0)) {
+		return fmt.Errorf("spend amount exceeds supported decimal precision: %s", amount)
+	}
+
+	if scaledAmount.IsNegative() {
+		return fmt.Errorf("spend amount cannot be negative: %s", amount)
+	}
+
+	return c.rdb.IncrBy(ctx, key, scaledAmount.IntPart()).Err()
 }
 
-// method to check the budget
-func (c *Client) GetSpend(ctx context.Context, projectID string) (float64, error) {
+func (c *Client) GetSpend(
+	ctx context.Context,
+	projectID string,
+) (decimal.Decimal, error) {
 	currentMonth := time.Now().UTC().Format("2006-01")
 	key := fmt.Sprintf("project:%s:spend:%s", projectID, currentMonth)
-	val, err := c.rdb.Get(ctx, key).Float64()
-	if err == redis.Nil {
-		return 0.0, nil
-	}
 
+	units, err := c.rdb.Get(ctx, key).Int64()
 	if err != nil {
-		return 0.0, fmt.Errorf("error getting spend: %w", err)
+		if errors.Is(err, redis.Nil) {
+			return decimal.Zero, nil
+		}
+		return decimal.Zero, err
 	}
 
-	return val, nil
+	return decimal.NewFromInt(units).Shift(-spendScale), nil
 }
 
 // reset spend (cache invalidation)
@@ -107,4 +134,48 @@ func (c *Client) DeleteKeyMetadata(ctx context.Context, hashedKey string) error 
 // method for closing redis instance
 func (c *Client) Close() error {
 	return c.rdb.Close()
+}
+
+// Model Rates
+func (c *Client) SetModelMetaData(ctx context.Context, modelName string, inputTokenCost, outputTokenCost decimal.Decimal) error {
+	key := "setu:model_rates:" + modelName
+
+	err := c.rdb.HSet(ctx, key, map[string]interface{}{
+		"input_cost":  inputTokenCost.String(),
+		"output_cost": outputTokenCost.String(),
+	}).Err()
+	if err != nil {
+		return fmt.Errorf("failed to set the model metadata")
+	}
+
+	return c.rdb.Expire(ctx, key, 5*time.Minute).Err()
+}
+
+func (c *Client) GetModelData(ctx context.Context, modelName string) (ModelRates, bool, error) {
+	key := "setu:model_rates:" + modelName
+
+	values, err := c.rdb.HGetAll(ctx, key).Result()
+	if err != nil {
+		return ModelRates{}, false, err
+	}
+
+	// Cache miss
+	if len(values) == 0 {
+		return ModelRates{}, false, nil
+	}
+
+	inputCost, err := decimal.NewFromString(values["input_cost"])
+	if err != nil {
+		return ModelRates{}, false, err
+	}
+
+	outputCost, err := decimal.NewFromString(values["output_cost"])
+	if err != nil {
+		return ModelRates{}, false, err
+	}
+
+	return ModelRates{
+		InputCost:  inputCost,
+		OutputCost: outputCost,
+	}, true, nil
 }
