@@ -96,7 +96,6 @@ func (b *Batcher) startWorker() {
 			logger.Error("failed to update spend into DB", slog.Any("projectID", event.ProjectID), slog.Any("err", err))
 
 		}
-
 		// Sending Alerts
 		// load alert config for project
 		alertConfig, err := b.db.Queries.GetAlertConfigByProjectID(ctx, event.ProjectID)

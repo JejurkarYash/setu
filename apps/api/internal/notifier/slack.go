@@ -38,12 +38,16 @@ func (s *SlackNotifier) Send(
 	budget float64,
 	threshold int32,
 ) error {
+
 	payload := map[string]string{
 		"text": fmt.Sprintf(
-			"🚨 *Setu Budget Alert*\n"+
-				"Project: %s\n"+
-				"Budget used: %d%%\n"+
-				"Current spend: $%.2f / $%.2f",
+			"🚨 *Setu | Monthly Budget Alert*\n\n"+
+				"*Project:* %s\n"+
+				"*Budget Utilization:* %d%%\n"+
+				"*Total Spend:* $%.8f\n"+
+				"*Monthly Budget:* $%.8f\n\n"+
+				"Your project has reached its configured budget alert threshold. "+
+				"Review your usage to avoid unexpected costs.",
 			projectName,
 			threshold,
 			spend,
