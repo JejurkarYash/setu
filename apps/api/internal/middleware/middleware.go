@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
-	"fmt"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -82,7 +81,7 @@ func (m *Middleware) AuthenticateLLM(next http.Handler) http.Handler {
 		// extracting keys from respective llm providers
 		var rawKey string
 		switch provider {
-	case "openai":
+		case "openai":
 			auth := r.Header.Get("Authorization")
 			rawKey = strings.TrimPrefix(auth, "Bearer ")
 
@@ -103,13 +102,11 @@ func (m *Middleware) AuthenticateLLM(next http.Handler) http.Handler {
 		// look in redis
 		metadata, err := m.rdb.GetKeyMetadata(r.Context(), hashedKey)
 		if err != nil {
-			m.logger.Debug("metadat is not present in redis")
+			m.logger.Debug("metadata is not present in redis")
 		}
 
 		// authenticated
 		if metadata != nil {
-
-			fmt.Println("metadata:", metadata)
 
 			// setting projectID & budgetLimit
 			projectID = metadata.ProjectID
@@ -131,8 +128,6 @@ func (m *Middleware) AuthenticateLLM(next http.Handler) http.Handler {
 				w.Write([]byte("Unauthorized: Invalide API Key"))
 				return
 			}
-
-			fmt.Println("dbMeta", dbMeta)
 
 			// setting projectID & budgetLimit
 			projectID = dbMeta.ProjectID
@@ -176,8 +171,6 @@ func (m *Middleware) AuthenticateLLM(next http.Handler) http.Handler {
 		if err != nil {
 			m.logger.Error("failed to check budget", slog.Any("err", err))
 		}
-
-		fmt.Println("cost:", cost)
 
 		if cost.GreaterThan(budgetLimit) {
 			//  block the request

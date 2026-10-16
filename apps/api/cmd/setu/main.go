@@ -91,7 +91,7 @@ func main() {
 	// notifier for sending alerts
 	notifier := notifier.NewSlackNotifier()
 	// batcher ( for processing events )  -> also spin 5 background goroutines to process events
-	batcher := telemetry.NewBatcher(db, appLogger, 1000, 5, notifier, encryptor)
+	batcher := telemetry.NewBatcher(db, appLogger, 10000, 20, notifier, encryptor)
 
 	// middleware init
 	middleware := middleware.NewMiddleware(db, rdb, appLogger, encryptor)

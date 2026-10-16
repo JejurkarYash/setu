@@ -2,7 +2,6 @@ package telemetry
 
 import (
 	"context"
-	"errors"
 	"log/slog"
 	"sync"
 	"time"
@@ -12,7 +11,6 @@ import (
 	"github.com/JejurkarYash/setu/internal/lib/utils"
 	"github.com/JejurkarYash/setu/internal/notifier"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/shopspring/decimal"
 )
 
@@ -34,6 +32,11 @@ type Batcher struct {
 	encryptor     *utils.Encryptor
 }
 
+const (
+	batchSize     = 500                    // Flush when slice hits 500 items
+	flushInterval = 100 * time.Millisecond // Or flush every 100ms
+)
+
 func NewBatcher(db *database.Database, logger *slog.Logger, bufferSize int, workerPool int, slackNotifier *notifier.SlackNotifier, encryptor *utils.Encryptor) *Batcher {
 
 	b := &Batcher{
@@ -54,129 +57,159 @@ func NewBatcher(db *database.Database, logger *slog.Logger, bufferSize int, work
 
 }
 
-// worker
 func (b *Batcher) startWorker() {
 	defer b.wg.Done()
 
-	for event := range b.ch { // -> listen to channel and pick the events one by one
+	events := make([]BatcherEvent, 0, batchSize)
+	ticker := time.NewTicker(flushInterval)
+	defer ticker.Stop()
 
-		// attaching some context to logger
-		logger := b.logger.With(
-			slog.String("project_id", event.ProjectID),
+	for {
+		select {
+		case event, ok := <-b.ch:
+			if !ok {
+				// Channel closed: flush remaining and exit
+				if len(events) > 0 {
+					b.flushBatch(events)
+				}
+				return
+			}
+
+			events = append(events, event)
+			if len(events) >= batchSize {
+				b.flushBatch(events)
+				events = make([]BatcherEvent, 0, batchSize)
+			}
+
+		case <-ticker.C:
+			if len(events) > 0 {
+				b.flushBatch(events)
+				events = make([]BatcherEvent, 0, batchSize)
+			}
+		}
+	}
+}
+
+func (b *Batcher) flushBatch(events []BatcherEvent) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	// 1. Bulk insert usage logs using pgx.CopyFrom (high performance)
+	rows := make([][]any, len(events))
+	projectSpends := make(map[string]decimal.Decimal)
+
+	for i, e := range events {
+		rows[i] = []any{
+			e.ProjectID,
+			e.Model,
+			int32(e.InputToken),
+			int32(e.OutputToken),
+			int32(e.StatusCode),
+			e.TotalCost,
+			time.Now().UTC(),
+		}
+
+		// Aggregate spend per project locally in memory
+		projectSpends[e.ProjectID] = projectSpends[e.ProjectID].Add(e.TotalCost)
+	}
+
+	_, err := b.db.Pool.CopyFrom(
+		ctx,
+		pgx.Identifier{"usage_logs"},
+		[]string{"project_id", "model", "prompt_tokens", "completion_tokens", "status_code", "cost_usd", "created_at"},
+		pgx.CopyFromRows(rows),
+	)
+	if err != nil {
+		b.logger.Error("failed to bulk copy usage logs", "err", err)
+	}
+
+	// 2. Perform aggregated spend updates per project
+	for projectID, addedSpend := range projectSpends {
+		b.processProjectSpendAndAlert(ctx, projectID, addedSpend)
+	}
+}
+
+func (b *Batcher) processProjectSpendAndAlert(ctx context.Context, projectID string, addedSpend decimal.Decimal) {
+	// Atomic update to project spend
+	updatedProject, err := b.db.Queries.UpdateSpendDB(ctx, dbgen.UpdateSpendDBParams{
+		Spend: addedSpend,
+		ID:    projectID,
+	})
+	if err != nil {
+		b.logger.Error("failed to update aggregated spend", "project_id", projectID, "err", err)
+		return
+	}
+
+	// Offload Slack alert checking asynchronously so it doesn't block telemetry ingestion
+	go b.checkAndTriggerAlert(projectID, decimal.NewFromFloat(updatedProject.Spend), decimal.NewFromFloat(updatedProject.MonthlyBudget))
+}
+
+func (b *Batcher) checkAndTriggerAlert(projectID string, currentSpend, monthlyBudget decimal.Decimal) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	if monthlyBudget.IsZero() || monthlyBudget.IsNegative() {
+		return
+	}
+
+	alertConfig, err := b.db.Queries.GetAlertConfigByProjectID(ctx, projectID)
+	if err != nil {
+		return
+	}
+
+	spendInPct := int32(currentSpend.Div(monthlyBudget).Mul(decimal.NewFromInt(100)).IntPart())
+
+	if spendInPct >= alertConfig.TriggerThresholdPct && alertConfig.NotifySlack {
+		// Run Slack notification
+
+		lastNotified := alertConfig.LastNotifiedAt
+
+		now := time.Now().UTC()
+		monthStart := time.Date(
+			now.Year(),
+			now.Month(),
+			1,
+			0, 0, 0, 0,
+			time.UTC,
 		)
 
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		alreadyNotifiedThisMonth := lastNotified.Valid &&
+			!lastNotified.Time.Before(monthStart)
 
-		var projectUUID pgtype.UUID
-		if err := projectUUID.Scan(event.ProjectID); err != nil {
-			logger.Error("failed to parse projectID as UUID", slog.Any("error", err))
-			cancel()
-			continue // dont hang down here -> other should continue
-		}
+		if !alreadyNotifiedThisMonth && alertConfig.NotifySlack { // -> send slack alert
 
-		// Audit logs entry
-		_, err := b.db.Queries.InsertUsageLog(ctx, dbgen.InsertUsageLogParams{
-			ProjectID:        event.ProjectID,
-			Model:            event.Model,
-			PromptTokens:     int32(event.InputToken),
-			CompletionTokens: int32(event.OutputToken),
-			StatusCode:       int32(event.StatusCode),
-			CostUsd:          event.TotalCost,
-		})
-		if err != nil {
-			logger.Error("failed to insert logs", slog.Any("err", err))
-		}
-
-		// update spend into db
-		updatedProject, err := b.db.Queries.UpdateSpendDB(ctx, dbgen.UpdateSpendDBParams{
-			Spend: event.TotalCost,
-			ID:    event.ProjectID,
-		})
-
-		if err != nil {
-			logger.Error("failed to update spend into DB", slog.Any("projectID", event.ProjectID), slog.Any("err", err))
-
-		}
-		// Sending Alerts
-		// load alert config for project
-		alertConfig, err := b.db.Queries.GetAlertConfigByProjectID(ctx, event.ProjectID)
-		if err != nil {
-			if errors.Is(err, pgx.ErrNoRows) {
+			// decrypt the webhook url first
+			webhookURL, err := b.encryptor.Decrypt(alertConfig.SlackWebhookUrlEncrypted, alertConfig.SlackWebhookNonce)
+			if err != nil {
+				b.logger.Error("failed to decrypt webhook url ", slog.Any("err", err))
 				cancel()
-				continue
+				return
 			}
 
-			logger.Error("failed to load alert config", slog.Any("err", err))
+			// fetch project info
+			updatedProject, err := b.db.Queries.GetProjectByID(ctx, alertConfig.ProjectID)
+			if err != nil {
+				b.logger.Error("failed to load project info ", slog.Any("err", err))
+				cancel()
+				return
+			}
 
-			cancel()
-			continue
-		}
+			err = b.SlackNotifier.Send(ctx, webhookURL, updatedProject.Name, updatedProject.Spend, updatedProject.MonthlyBudget, alertConfig.TriggerThresholdPct)
+			if err != nil {
+				b.logger.Error("failed to send slack alert")
+				cancel()
+				return
+			}
 
-		// calculate percentage
-		if updatedProject.MonthlyBudget <= 0 {
-			cancel()
-			continue // avoid the divid by zero error
-		}
-
-		spendInPercentage := int32((updatedProject.Spend / updatedProject.MonthlyBudget) * 100)
-
-		if spendInPercentage >= alertConfig.TriggerThresholdPct { // threshold exceeded move forward
-
-			lastNotified := alertConfig.LastNotifiedAt
-
-			now := time.Now().UTC()
-			monthStart := time.Date(
-				now.Year(),
-				now.Month(),
-				1,
-				0, 0, 0, 0,
-				time.UTC,
-			)
-
-			alreadyNotifiedThisMonth := lastNotified.Valid &&
-				!lastNotified.Time.Before(monthStart)
-
-			if !alreadyNotifiedThisMonth && alertConfig.NotifySlack { // -> send slack alert
-				// decrypt the webhook url first
-				webhookURL, err := b.encryptor.Decrypt(alertConfig.SlackWebhookUrlEncrypted, alertConfig.SlackWebhookNonce)
-				if err != nil {
-					logger.Error("failed to decrypt webhook url ", slog.Any("err", err))
-
-					cancel()
-					continue
-				}
-				// fetch project info
-				project, err := b.db.Queries.GetProjectByID(ctx, alertConfig.ProjectID)
-				if err != nil {
-					logger.Error("failed to load project info ", slog.Any("err", err))
-
-					cancel()
-					continue
-				}
-
-				err = b.SlackNotifier.Send(ctx, webhookURL, project.Name, updatedProject.Spend, updatedProject.MonthlyBudget, alertConfig.TriggerThresholdPct)
-				if err != nil {
-					logger.Error("failed to send slack alert")
-
-					cancel()
-					continue
-				}
-
-				// update the alert config
-				err = b.db.Queries.UpdateLastNotifiedAt(ctx, event.ProjectID)
-				if err != nil {
-					logger.Error("failed to update status of last notifier at", slog.Any("err", err))
-
-					cancel()
-					continue
-				}
-
+			// update the alert config
+			err = b.db.Queries.UpdateLastNotifiedAt(ctx, projectID)
+			if err != nil {
+				b.logger.Error("failed to update status of last notifier at", slog.Any("err", err))
+				cancel()
+				return
 			}
 
 		}
-
-		// cancel context
-		cancel()
 	}
 }
 

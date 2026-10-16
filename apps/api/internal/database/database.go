@@ -79,7 +79,6 @@ func New(cfg *config.Config, logger *slog.Logger) (*Database, error) {
 	}
 
 	logger.Info("PostgreSQL connection pool initialized succesfully")
-
 	db := &Database{
 		Pool:    pool,
 		logger:  logger,

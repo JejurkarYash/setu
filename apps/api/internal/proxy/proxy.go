@@ -4,9 +4,11 @@ import (
 	"context"
 	"io"
 	"log/slog"
+	"net"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+	"time"
 
 	"github.com/JejurkarYash/setu/internal/database"
 	"github.com/JejurkarYash/setu/internal/telemetry"
@@ -51,6 +53,7 @@ type Engine struct {
 
 // proxy init
 func NewProxyEngine(p Provider, logger *slog.Logger, db *database.Database, batcher *telemetry.Batcher) *Engine {
+
 	return &Engine{
 		provider: p,
 		Logger:   logger,
@@ -61,7 +64,8 @@ func NewProxyEngine(p Provider, logger *slog.Logger, db *database.Database, batc
 
 // setting up the proxy engine
 func (e *Engine) SetupProxyEngine() *httputil.ReverseProxy {
-	return &httputil.ReverseProxy{
+
+	proxy := &httputil.ReverseProxy{
 		FlushInterval: -1,
 		Rewrite: func(pr *httputil.ProxyRequest) { // -> rewriting the outgoing request
 
@@ -124,4 +128,21 @@ func (e *Engine) SetupProxyEngine() *httputil.ReverseProxy {
 			return nil
 		},
 	}
+
+	// Custom transport configured for high concurrency & connection reuse
+	transport := &http.Transport{
+		Proxy: http.ProxyFromEnvironment,
+		DialContext: (&net.Dialer{
+			Timeout:   30 * time.Second,
+			KeepAlive: 30 * time.Second, // Keep TCP connections alive
+		}).DialContext,
+		MaxIdleConns:        1000, // Total idle connections across all hosts
+		MaxIdleConnsPerHost: 500,  // Idle connections kept open specifically for your target host
+		IdleConnTimeout:     90 * time.Second,
+		TLSHandshakeTimeout: 10 * time.Second,
+	}
+
+	proxy.Transport = transport
+
+	return proxy
 }

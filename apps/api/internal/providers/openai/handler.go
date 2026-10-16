@@ -110,7 +110,7 @@ func (h *Handler) TargetURL() string {
 		return url
 	}
 
-	return "http://localhost:8081" // replace this url with openai
+	return "http://127.0.0.1:8081" // replace this url with openai
 }
 
 func (h *Handler) InjectAPI(pr *httputil.ProxyRequest) error {
