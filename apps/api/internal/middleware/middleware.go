@@ -82,7 +82,7 @@ func (m *Middleware) AuthenticateLLM(next http.Handler) http.Handler {
 		// extracting keys from respective llm providers
 		var rawKey string
 		switch provider {
-		case "openai":
+	case "openai":
 			auth := r.Header.Get("Authorization")
 			rawKey = strings.TrimPrefix(auth, "Bearer ")
 

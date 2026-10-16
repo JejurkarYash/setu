@@ -10,6 +10,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httputil"
+	"os"
 	"strings"
 
 	"github.com/JejurkarYash/setu/internal/billing"
@@ -103,6 +104,12 @@ func (h *Handler) handleProxyRequest(w http.ResponseWriter, r *http.Request) {
 
 // interface methods
 func (h *Handler) TargetURL() string {
+
+	url := os.Getenv("OPENAI_TARGET_URL")
+	if url != "" {
+		return url
+	}
+
 	return "http://localhost:8081" // replace this url with openai
 }
 

@@ -75,6 +75,7 @@ func main() {
 	db, err := database.New(config, appLogger)
 	if err != nil {
 		appLogger.Error("failed to initialized database:", slog.Any("err", err))
+		os.Exit(1)
 	}
 
 	// redis initalization
@@ -131,7 +132,7 @@ func main() {
 	// starting the server in new goroutine
 	go func() {
 		if err := server.Start(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			log.Fatal("failed to start the server")
+			log.Fatal("failed to start the server", err)
 		}
 	}()
 

@@ -61,10 +61,21 @@ func New(cfg *config.Config, logger *slog.Logger) (*Database, error) {
 
 	pool, err := pgxpool.NewWithConfig(ctx, poolConfig)
 
-	// ping the database to ensure connection is alive
-	if err := pool.Ping(ctx); err != nil {
-		return nil, fmt.Errorf("failed to ping postgres:%w", err)
+	// ping the database with retries to wait for postgres to finish startup
+	var pingErr error
+	for attempt := 1; attempt <= 10; attempt++ {
+		pingCtx, pingCancel := context.WithTimeout(context.Background(), 2*time.Second)
+		pingErr = pool.Ping(pingCtx)
+		pingCancel()
+		if pingErr == nil {
+			break
+		}
+		logger.Warn("waiting for postgres to be ready...", slog.Int("attempt", attempt), slog.Any("err", pingErr))
+		time.Sleep(1 * time.Second)
+	}
 
+	if pingErr != nil {
+		return nil, fmt.Errorf("failed to ping postgres after retries: %w", pingErr)
 	}
 
 	logger.Info("PostgreSQL connection pool initialized succesfully")
