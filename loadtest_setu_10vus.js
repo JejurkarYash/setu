@@ -7,7 +7,7 @@ export const options = {
     setu_load: {
       executor: 'constant-vus',
       vus: 10,
-      duration: '60s',
+      duration: '5m',
     },
   },
 
