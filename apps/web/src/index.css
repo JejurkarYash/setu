@@ -1,0 +1,62 @@
+/* Geist + Jetbrains Mono */ 
+@import url('https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+@import "tailwindcss";
+
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+@theme {
+  /* Setu brand */
+  --color-brand: #E879F9;
+  --color-brand-hover: #F0ABFC;
+  --color-brand-active: #D946EF;
+  --color-brand-muted: #4A044E;
+
+  /* Application surfaces */
+  --color-background: #111111;
+  --color-surface: #171717;
+  --color-surface-elevated: #222222;
+  --color-border: #383838;
+
+  /* Typography */
+  --color-text-primary: #F5F5F5;
+  --color-text-secondary: #A3A3A3;
+  --color-text-muted: #737373;
+
+  /* Semantic status colors */
+  --color-success: #4ADE80;
+  --color-warning: #FBBF24;
+  --color-error: #F87171;
+  --color-info: #60A5FA; 
+
+   /* Typography */
+  --font-sans: "Geist", sans-serif;
+  --font-mono: "JetBrains Mono", monospace;
+
+}
+
+html {
+  font-family:'Geist', sans-serif; 
+}
+
+body {
+  margin: 0;
+  background: #111111;
+  color: #F5F5F5;
+  font-family: "Geist", sans-serif;
+  font-weight: 400;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+} 
+
+code,
+pre,
+kbd,
+samp {
+  font-family: "JetBrains Mono", monospace;
+}
