@@ -20,28 +20,28 @@ services:
     container_name: llm-gateway-redis
     ports:
       - "6379:6379"
-  # api:
-  #   build:
-  #     context: ./apps/api
-  #     dockerfile: Dockerfile
-  #   container_name: setu-api
-  #   ports:
-  #     - "8080:8080"
-  #   extra_hosts:
-  #     - "host.docker.internal:host-gateway"
-  #   env_file:
-  #     - ./apps/api/.env
-  #   environment:
-  #     - SETU_DATABASE.HOST=postgres
-  #     - SETU_REDIS.ADDRESS=redis:6379
-  #     - ANTHROPIC_TARGET_URL=http://host.docker.internal:8081
-  #     - OPENAI_TARGET_URL=http://host.docker.internal:8081
-  #   depends_on:
-  #     postgres:
-  #       condition: service_healthy
-  #     redis:
-  #       condition: service_started
-  #   restart: unless-stopped
+  api:
+    build:
+      context: ./apps/api
+      dockerfile: Dockerfile
+    container_name: setu-api
+    ports:
+      - "8080:8080"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    env_file:
+      - ./apps/api/.env
+    environment:
+      - SETU_DATABASE.HOST=postgres
+      - SETU_REDIS.ADDRESS=redis:6379
+      - ANTHROPIC_TARGET_URL=http://host.docker.internal:8081
+      - OPENAI_TARGET_URL=http://host.docker.internal:8081
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    restart: unless-stopped
 
 volumes:
   postgres_data:
