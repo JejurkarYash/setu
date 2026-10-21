@@ -1,10 +1,12 @@
 /* Geist + Jetbrains Mono */ 
-@import url('https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+@import url('[https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap](https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap)');
 
 @import "tailwindcss";
 
-
-* {
+/* Corrected Universal Reset */
+*,
+*::before,
+*::after {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
@@ -34,14 +36,13 @@
   --color-error: #F87171;
   --color-info: #60A5FA; 
 
-   /* Typography */
+  /* Typography */
   --font-sans: "Geist", sans-serif;
   --font-mono: "JetBrains Mono", monospace;
-
 }
 
 html {
-  font-family:'Geist', sans-serif; 
+  font-family: 'Geist', sans-serif; 
 }
 
 body {

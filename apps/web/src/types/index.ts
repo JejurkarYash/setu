@@ -1,5 +1,3 @@
-export type Provider = "openai" | "anthropic" | "gemini";
-
 export interface Project {
   id: string;
   name: string;
@@ -38,3 +36,5 @@ export interface AlertSetting {
   last_notified_at?: string;
   created_at: string;
 }
+
+export type Provider = "openai" | "anthropic" | "gemini";

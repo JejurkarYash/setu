@@ -10,7 +10,7 @@ import {
   Settings,
   PanelLeftOpen,
   PanelLeftClose,
-  ArrowLeft,
+  LogOut,
   type LucideIcon,
 } from "lucide-react";
 
@@ -21,7 +21,6 @@ export type NavItem = {
   icon: LucideIcon;
 };
 
-// Global Workspace Navigation (when at /dashboard)
 export const globalNavItems: NavItem[] = [
   {
     label: "Projects",
@@ -37,7 +36,6 @@ export const globalNavItems: NavItem[] = [
   },
 ];
 
-// Project Workspace Navigation (when at /dashboard/project/:projectId/...)
 export const getProjectNavItems = (projectId: string): NavItem[] => [
   {
     label: "Overview",
@@ -73,10 +71,10 @@ export const getProjectNavItems = (projectId: string): NavItem[] => [
 
 function BrandMark() {
   return (
-    <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-brand text-background shadow-md shadow-brand/25">
+    <span className="flex size-8 shrink-0    items-center justify-center bg-brand text-background shadow-md shadow-brand/25">
       <svg
         aria-hidden="true"
-        className="size-5"
+        className="size-4"
         viewBox="0 0 24 24"
         fill="none"
       >
@@ -92,9 +90,6 @@ function BrandMark() {
   );
 }
 
-// -------------------------------------------------------------
-// Desktop Nav Button (Square when collapsed, Rectangular when open)
-// -------------------------------------------------------------
 function DesktopNavButton({
   item,
   collapsed,
@@ -111,9 +106,7 @@ function DesktopNavButton({
 
   return (
     <div
-      className={`relative flex items-center  ${
-        collapsed ? "justify-center w-full" : "w-full"
-      }`}
+      className="relative flex items-center w-full"
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
@@ -122,18 +115,18 @@ function DesktopNavButton({
         aria-label={item.label}
         aria-current={isActive ? "page" : undefined}
         onClick={onClick}
-        whileTap={{ scale: 0.94 }}
-        className={`group relative flex items-center cursor-pointer select-none transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20 ${
+        whileTap={{ scale: 0.96 }}
+        className={`group relative flex items-center w-full cursor-pointer select-none transition-colors duration-150 focus-visible:outline-none ${
           collapsed
-            ? "size-10 aspect-square justify-center rounded-xl"
-            : "h-11 w-full justify-start  px-3.5 gap-6"
+            ? "size-10 aspect-square justify-center mx-auto"
+            : "h-10 justify-start px-3 gap-3  "
         } ${isActive ? "text-white" : "text-[#8e8e8e] hover:text-white"}`}
       >
-        {/* Active Pill (Pure White / Subtle Light Glass, No Brand Color) */}
+        {/* Active Gray Background Box */}
         {isActive && (
           <motion.div
             layoutId="desktopActiveBackground"
-            className="absolute inset-0 bg-white/10 border border-white/10 shadow-sm shadow-black/40"
+            className="absolute inset-0 bg-white/10 border border-white/10 shadow-sm"
             transition={{ type: "spring", stiffness: 380, damping: 30 }}
           />
         )}
@@ -142,7 +135,7 @@ function DesktopNavButton({
         {!isActive && isHovered && (
           <motion.div
             layoutId="desktopHoverBackground"
-            className="absolute inset-0  bg-white/[0.04]"
+            className="absolute inset-0 bg-white/[0.04]"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -150,18 +143,12 @@ function DesktopNavButton({
           />
         )}
 
-        {/* Icon (ALWAYS WHITE WHEN ACTIVE) */}
         <Icon
-          className={`relative z-10 size-5 shrink-0 transition-colors duration-150 ${
+          className={`relative z-10 size-4.5 shrink-0 transition-colors duration-150 ${
             isActive ? "text-white" : "text-[#8e8e8e] group-hover:text-white"
-          } ${
-            collapsed 
-            ? "" 
-            :"justify-center left-2 "
-          }`}
+          } ${collapsed ? "" : "justify-center left-3 "}`}
         />
 
-        {/* Label (shown only when expanded) */}
         <AnimatePresence initial={false}>
           {!collapsed && (
             <motion.span
@@ -173,7 +160,7 @@ function DesktopNavButton({
                 isActive
                   ? "text-white font-semibold"
                   : "text-[#a3a3a3] group-hover:text-white"
-              }`}
+              } ${collapsed ? "hidden" : " jusitfy-center left-4 "}`}
             >
               {item.label}
             </motion.span>
@@ -181,7 +168,7 @@ function DesktopNavButton({
         </AnimatePresence>
       </motion.button>
 
-      {/* Floating Tooltip (shown on hover when collapsed) */}
+      {/* Floating Tooltip */}
       <AnimatePresence>
         {collapsed && isHovered && (
           <motion.div
@@ -191,7 +178,7 @@ function DesktopNavButton({
             transition={{ duration: 0.12 }}
             className="pointer-events-none absolute left-[calc(100%+12px)] top-1/2 -translate-y-1/2 z-50 flex items-center"
           >
-            <div className=" border p-2  border-border bg-[#181818] px-2.5 py-1 text-xs font-medium text-white shadow-xl shadow-black/70 backdrop-blur-md whitespace-nowrap">
+            <div className="border border-border w-full h-6 flex items-center text-center bg-[#181818] px-3 py-1 text-xs font-medium text-white shadow-xl backdrop-blur-md whitespace-nowrap">
               {item.label}
             </div>
           </motion.div>
@@ -201,9 +188,6 @@ function DesktopNavButton({
   );
 }
 
-// -------------------------------------------------------------
-// Mobile Bottom Floating Nav Item
-// -------------------------------------------------------------
 function MobileNavItem({
   item,
   isActive,
@@ -218,24 +202,22 @@ function MobileNavItem({
   return (
     <motion.button
       type="button"
-      whileTap={{ scale: 0.9 }}
+      whileTap={{ scale: 0.92 }}
       onClick={onClick}
       aria-label={item.label}
       aria-current={isActive ? "page" : undefined}
-      className={`group relative flex flex-1 flex-col items-center justify-center h-full rounded-2xl cursor-pointer select-none transition-colors duration-150 focus-visible:outline-none ${
+      className={`group relative flex flex-1 flex-col items-center justify-center h-full cursor-pointer select-none transition-colors duration-150 focus-visible:outline-none ${
         isActive ? "text-white" : "text-[#7f7f7f] hover:text-[#b5b5b5]"
       }`}
     >
-      {/* Active Pill Highlight */}
       {isActive && (
         <motion.div
           layoutId="mobileActiveIndicator"
-          className="absolute inset-0 bg-white/10 border border-white/10 h-[70%] w-[70%] justify-center top-2 left-3   shadow-inner"
-          transition={{ type: "spring", stiffness: 400, damping: 30 }}
+          className="absolute inset-1.5 bg-white/10 border border-white/15 shadow-sm"
+          transition={{ type: "spring", stiffness: 400, damping: 32 }}
         />
       )}
 
-      {/* Icon */}
       <Icon
         className={`relative z-10 size-5 shrink-0 transition-transform duration-150 ${
           isActive
@@ -243,14 +225,10 @@ function MobileNavItem({
             : "text-[#808080] group-hover:text-white"
         }`}
       />
-
     </motion.button>
   );
 }
 
-// -------------------------------------------------------------
-// Main Sidebar Component
-// -------------------------------------------------------------
 export default function Sidebar({
   collapsed,
   onToggle,
@@ -262,15 +240,12 @@ export default function Sidebar({
   const location = useLocation();
   const navigate = useNavigate();
 
-  // Detect whether we are in a Project context
-  // Matches: /dashboard/project/:projectId/...
   const projectPathMatch = location.pathname.match(
-    /^\/dashboard\/project\/([^/]+)/
+    /^\/dashboard\/project\/([^/]+)/,
   );
   const isProjectContext = Boolean(projectPathMatch);
   const currentProjectId = projectPathMatch ? projectPathMatch[1] : null;
 
-  // Determine which navigation list to render
   const navItems: NavItem[] =
     isProjectContext && currentProjectId
       ? getProjectNavItems(currentProjectId)
@@ -291,101 +266,68 @@ export default function Sidebar({
 
   return (
     <>
-      {/* ======================================================= */}
-      {/* Desktop Sidebar (hidden on mobile, md:flex)             */}
-      {/* ======================================================= */}
+      {/* ── Desktop Sidebar ──────────────────────────────────── */}
       <motion.aside
         animate={{ width: collapsed ? 72 : 240 }}
         transition={{ type: "spring", stiffness: 350, damping: 32 }}
-        className={`fixed inset-y-0   left-0 z-30 hidden md:flex flex-col  border-r border-border bg-[#111111] select-none
-          ${
-            collapsed 
-             ? "gap-2 "
-             : ""
-          }
-          `}
+        className="fixed inset-y-0 left-0 z-30 hidden md:flex flex-col border-r border-border bg-[#0D0D0D] select-none justify-between"
       >
-        {/* Header / Brand Area */}
-        <div className="relative flex  h-16 items-center border-b border-border px-3.5">
-          {collapsed ? (
-            /* Collapsed Header: Hovering reveals PanelLeftOpen */
-            <div className="flex w-full items-center justify-center">
-              <button
-                type="button"
-                onClick={onToggle}
-                onMouseEnter={() => setBrandHovered(true)}
-                onMouseLeave={() => setBrandHovered(false)}
-                aria-label="Expand sidebar"
-                title="Expand sidebar"
-                className="relative flex size-10 items-center justify-center  cursor-pointer transition-all duration-200 hover:bg-surface-elevated/80"
-              >
-                <AnimatePresence mode="wait">
-                  {brandHovered ? (
-                    <motion.div
-                      key="panel-open"
-                      initial={{ opacity: 0, scale: 0.8 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      exit={{ opacity: 0, scale: 0.8 }}
-                      transition={{ duration: 0.12 }}
-                      className="flex items-center justify-center text-white"
-                    >
-                      <PanelLeftOpen className="size-5" />
-                    </motion.div>
-                  ) : (
-                    <motion.div
-                      key="brand-mark"
-                      initial={{ opacity: 0, scale: 0.8 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      exit={{ opacity: 0, scale: 0.8 }}
-                      transition={{ duration: 0.12 }}
-                    >
-                      <BrandMark />
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </button>
-            </div>
-          ) : (
-            /* Open Header: Brand on left, PanelLeftClose on right */
-            <div className="flex w-full items-center justify-between">
-              <div
-                className="flex items-center gap-3 cursor-pointer"
-                onClick={() => navigate("/dashboard")}
-              >
-                <BrandMark />
-                <span className="text-base font-semibold tracking-wide text-white whitespace-nowrap">
-                  Setu
-                </span>
+        <div className="w-full">
+          {/* Header Section */}
+          <div className="relative flex h-16 items-center border-b border-border px-3.5">
+            {collapsed ? (
+              <div className="flex w-full items-center justify-center">
+                <button
+                  type="button"
+                  onClick={onToggle}
+                  onMouseEnter={() => setBrandHovered(true)}
+                  onMouseLeave={() => setBrandHovered(false)}
+                  className="relative flex size-10 items-center justify-center cursor-pointer transition-all duration-200 hover:bg-white/[0.05]"
+                >
+                  <AnimatePresence mode="wait">
+                    {brandHovered ? (
+                      <motion.div
+                        key="panel-open"
+                        initial={{ opacity: 0, scale: 0.8 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.8 }}
+                        className="flex items-center justify-center text-white"
+                      >
+                        <PanelLeftOpen className="size-5" />
+                      </motion.div>
+                    ) : (
+                      <motion.div key="brand-mark">
+                        <BrandMark />
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </button>
               </div>
+            ) : (
+              <div className="flex w-full items-center justify-center gap-26 left-2 ">
+                <div
+                  className="flex items-center gap-3 cursor-pointer "
+                  onClick={() => navigate("/dashboard")}
+                >
+                  <BrandMark />
+                  <span className="text-sm font-semibold tracking-wide text-white whitespace-nowrap">
+                    Setu
+                  </span>
+                </div>
 
-              <button
-                type="button"
-                onClick={onToggle}
-                aria-label="Collapse sidebar"
-                title="Collapse sidebar"
-                className="flex size-9 items-center justify-center  text-text-muted hover:bg-surface-elevated hover:text-white transition-colors cursor-pointer"
-              >
-                <PanelLeftClose className="size-5" />
-              </button>
-            </div>
-          )}
-        </div>
+                <button
+                  type="button"
+                  onClick={onToggle}
+                  className="flex size-8 items-center justify-center text-zinc-400 hover:bg-white/[0.05] hover:text-white transition-colors cursor-pointer"
+                >
+                  <PanelLeftClose className="size-5" />
+                </button>
+              </div>
+            )}
+          </div>
 
-      
-
-        {/* Primary Navigation List */}
-        <nav
-          aria-label="Primary navigation"
-          className={`flex flex-1 flex-col pt-4 pb-4 ${
-            collapsed ? "px-0 items-center" : "px-3.5"
-          }`}
-        >
-          {/* Main items */}
-          <div
-            className={`flex flex-col gap-2 w-full ${
-              collapsed ? "items-center" : ""
-            }`}
-          >
+          {/* Nav Section (p-3 guarantees left/right/top breathing room) */}
+          <nav className="flex flex-col p-3 space-y-1 w-full">
             {navItems.map((item) => (
               <DesktopNavButton
                 key={item.label}
@@ -395,40 +337,67 @@ export default function Sidebar({
                 onClick={() => navigate(item.path)}
               />
             ))}
-          </div>
 
-          {/* Quick link to All Projects if inside a project at the bottom */}
-          {isProjectContext && (
-            <div
-              className={`mt-auto pt-3 border-t border-border/60 flex flex-col w-full ${
-                collapsed ? "items-center" : ""
-              }`}
-            >
-              <DesktopNavButton
-                item={{
-                  label: "All Projects",
-                  mobileLabel: "Projects",
-                  path: "/dashboard",
-                  icon: Box,
-                }}
-                collapsed={collapsed}
-                isActive={location.pathname === "/dashboard"}
-                onClick={() => navigate("/dashboard")}
-              />
+            {isProjectContext && (
+              <div className="mt-4 pt-3 border-t border-border/60 flex flex-col w-full">
+                <DesktopNavButton
+                  item={{
+                    label: "All Projects",
+                    mobileLabel: "Projects",
+                    path: "/dashboard",
+                    icon: Box,
+                  }}
+                  collapsed={collapsed}
+                  isActive={location.pathname === "/dashboard"}
+                  onClick={() => navigate("/dashboard")}
+                />
+              </div>
+            )}
+          </nav>
+        </div>
+
+        {/* User Profile Footer */}
+        <div className="border-t border-border/60 bg-[#0D0D0D] px-4 py-6 shrink-0 mt-auto">
+          <div
+            className={`group relative flex items-center gap-3 p-2.5 hover:bg-white/[0.04] transition-colors cursor-pointer select-none ${
+              collapsed ? "justify-center px-0" : "px-3"
+            }`}
+          >
+            {/* Avatar Box */}
+            <div className="flex size-9 shrink-0 items-center justify-center bg-zinc-800 text-xs font-semibold text-white border border-zinc-700 shadow-sm">
+              U
             </div>
-          )}
-        </nav>
+
+            {!collapsed && (
+              <div className="flex flex-1 items-center justify-between min-w-0">
+                <div className="truncate pr-3">
+                  <p className="text-xs font-semibold text-white truncate leading-tight">
+                    User Account
+                  </p>
+                  <p className="text-[10px] text-zinc-400 truncate leading-tight mt-1">
+                    user@setu.dev
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  title="Sign out"
+                  aria-label="Sign out"
+                  className="p-1.5 text-zinc-400 hover:text-white transition-colors shrink-0 mr-2"
+                >
+                  <LogOut className="size-4" />
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
       </motion.aside>
 
-      {/* ======================================================= */}
-      {/* Mobile Floating Pill Navigation                         */}
-      {/* ======================================================= */}
+      {/* Mobile Nav */}
       <motion.nav
-        aria-label="Mobile navigation"
         initial={{ y: 80, opacity: 0, x: "-50%" }}
         animate={{ y: 0, opacity: 1, x: "-50%" }}
         transition={{ type: "spring", stiffness: 320, damping: 28 }}
-        className="fixed bottom-6 left-1/2 z-40 flex items-center justify-between gap-1 w-[calc(100%-1.75rem)] max-w-[430px] h-[64px] rounded-sm  border border-white/10 bg-[#0d0d0d]/95 px-2.5 py-1.5 shadow-2xl shadow-black/90 backdrop-blur-2xl md:hidden select-none"
+        className="fixed bottom-6 left-1/2 z-40 flex items-center justify-between gap-1 w-[calc(100%-1.75rem)] max-w-[360px] h-[52px] border border-white/10 bg-[#0d0d0d]/95 px-2 py-1 shadow-2xl backdrop-blur-2xl md:hidden select-none"
       >
         {navItems.map((item) => (
           <MobileNavItem
