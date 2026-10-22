@@ -52,7 +52,7 @@ export default function CreateProjectModal({
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            padding: "24px",
+            padding: "20px",
             backgroundColor: "rgba(0, 0, 0, 0.85)",
             backdropFilter: "blur(8px)",
           }}
@@ -65,16 +65,16 @@ export default function CreateProjectModal({
             style={{
               width: "100%",
               maxWidth: "520px",
-              backgroundColor: "#0c0c0c",
-              border: "1px solid #27272a",
+              backgroundColor: "#121212",
+              border: "1px solid #222222",
               padding: "28px",
               boxSizing: "border-box",
               color: "#ffffff",
-              fontFamily: "'JetBrains Mono', monospace",
-              boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.8)",
+              boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.9)",
+              userSelect: "none",
             }}
           >
-            {/* Header */}
+            {/* Modal Header */}
             <div
               style={{
                 display: "flex",
@@ -82,73 +82,59 @@ export default function CreateProjectModal({
                 justifyContent: "space-between",
                 paddingBottom: "16px",
                 marginBottom: "24px",
-                borderBottom: "1px solid #27272a",
+                borderBottom: "1px solid #1f1f1f",
               }}
             >
               <div
-                style={{ display: "flex", alignItems: "center", gap: "12px" }}
+                style={{ display: "flex", alignItems: "center", gap: "10px" }}
               >
-                <div
+                <span
                   style={{
-                    width: "36px",
-                    height: "36px",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    backgroundColor: "rgba(168, 85, 247, 0.1)",
-                    border: "1px solid rgba(168, 85, 247, 0.3)",
-                    flexShrink: 0,
+                    width: "8px",
+                    height: "8px",
+                    backgroundColor: "#34D399",
+                    borderRadius: "50%",
+                    display: "inline-block",
+                  }}
+                />
+                <h3
+                  style={{
+                    fontSize: "12px",
+                    fontFamily: "'JetBrains Mono', monospace",
+                    fontWeight: 700,
+                    color: "#ffffff",
+                    letterSpacing: "0.08em",
+                    margin: 0,
+                    textTransform: "uppercase",
                   }}
                 >
-                  <Terminal size={18} color="#c084fc" />
-                </div>
-                <div>
-                  <h3
-                    style={{
-                      fontSize: "13px",
-                      fontWeight: 700,
-                      color: "#ffffff",
-                      letterSpacing: "0.1em",
-                      textTransform: "uppercase",
-                      margin: 0,
-                      lineHeight: 1.2,
-                    }}
-                  >
-                    NEW GATEWAY SETUP
-                  </h3>
-                  <p
-                    style={{
-                      fontSize: "11px",
-                      color: "#a1a1aa",
-                      margin: "4px 0 0 0",
-                      lineHeight: 1.2,
-                    }}
-                  >
-                    Configure budget caps & rate limits
-                  </p>
-                </div>
+                  NEW GATEWAY SETUP
+                </h3>
               </div>
 
               <button
                 type="button"
                 onClick={onClose}
                 style={{
-                  width: "32px",
-                  height: "32px",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  background: "transparent",
+                  width: "28px",
+                  height: "28px",
+                  backgroundColor: "transparent",
                   border: "none",
-                  color: "#a1a1aa",
+                  color: "#71717a",
                   cursor: "pointer",
+                  transition: "color 0.2s ease",
                 }}
+                onMouseEnter={(e) => (e.currentTarget.style.color = "#ffffff")}
+                onMouseLeave={(e) => (e.currentTarget.style.color = "#71717a")}
               >
-                <X size={18} />
+                <X size={16} />
               </button>
             </div>
 
-            {/* Form */}
+            {/* Modal Form */}
             <form
               onSubmit={handleSubmit}
               style={{ display: "flex", flexDirection: "column", gap: "20px" }}
@@ -160,15 +146,13 @@ export default function CreateProjectModal({
                 <label
                   style={{
                     fontSize: "11px",
+                    fontFamily: "'JetBrains Mono', monospace",
                     fontWeight: 700,
-                    color: "#d4d4d8",
+                    color: "#71717a",
                     textTransform: "uppercase",
                     letterSpacing: "0.05em",
                   }}
                 >
-                  <span style={{ color: "#c084fc", marginRight: "6px" }}>
-                    &gt;
-                  </span>{" "}
                   PROJECT NAME
                 </label>
                 <input
@@ -181,14 +165,21 @@ export default function CreateProjectModal({
                     width: "100%",
                     height: "42px",
                     padding: "0 14px",
-                    backgroundColor: "#141414",
-                    border: "1px solid #27272a",
+                    backgroundColor: "#171717",
+                    border: "1px solid #222222",
                     color: "#ffffff",
                     fontFamily: "'JetBrains Mono', monospace",
                     fontSize: "12px",
                     outline: "none",
                     boxSizing: "border-box",
                   }}
+                  onFocus={(e) =>
+                    (e.currentTarget.style.borderColor =
+                      "rgba(168, 85, 247, 0.8)")
+                  }
+                  onBlur={(e) =>
+                    (e.currentTarget.style.borderColor = "#222222")
+                  }
                 />
               </div>
 
@@ -210,15 +201,13 @@ export default function CreateProjectModal({
                   <label
                     style={{
                       fontSize: "11px",
+                      fontFamily: "'JetBrains Mono', monospace",
                       fontWeight: 700,
-                      color: "#d4d4d8",
+                      color: "#71717a",
                       textTransform: "uppercase",
                       letterSpacing: "0.05em",
                     }}
                   >
-                    <span style={{ color: "#c084fc", marginRight: "6px" }}>
-                      &gt;
-                    </span>{" "}
                     BUDGET ($/MO)
                   </label>
                   <input
@@ -232,14 +221,21 @@ export default function CreateProjectModal({
                       width: "100%",
                       height: "42px",
                       padding: "0 14px",
-                      backgroundColor: "#141414",
-                      border: "1px solid #27272a",
+                      backgroundColor: "#171717",
+                      border: "1px solid #222222",
                       color: "#ffffff",
                       fontFamily: "'JetBrains Mono', monospace",
                       fontSize: "12px",
                       outline: "none",
                       boxSizing: "border-box",
                     }}
+                    onFocus={(e) =>
+                      (e.currentTarget.style.borderColor =
+                        "rgba(168, 85, 247, 0.8)")
+                    }
+                    onBlur={(e) =>
+                      (e.currentTarget.style.borderColor = "#222222")
+                    }
                   />
                 </div>
 
@@ -253,15 +249,13 @@ export default function CreateProjectModal({
                   <label
                     style={{
                       fontSize: "11px",
+                      fontFamily: "'JetBrains Mono', monospace",
                       fontWeight: 700,
-                      color: "#d4d4d8",
+                      color: "#71717a",
                       textTransform: "uppercase",
                       letterSpacing: "0.05em",
                     }}
                   >
-                    <span style={{ color: "#c084fc", marginRight: "6px" }}>
-                      &gt;
-                    </span>{" "}
                     PROVIDER
                   </label>
                   <select
@@ -271,8 +265,8 @@ export default function CreateProjectModal({
                       width: "100%",
                       height: "42px",
                       padding: "0 10px",
-                      backgroundColor: "#141414",
-                      border: "1px solid #27272a",
+                      backgroundColor: "#171717",
+                      border: "1px solid #222222",
                       color: "#ffffff",
                       fontFamily: "'JetBrains Mono', monospace",
                       fontSize: "12px",
@@ -280,6 +274,13 @@ export default function CreateProjectModal({
                       cursor: "pointer",
                       boxSizing: "border-box",
                     }}
+                    onFocus={(e) =>
+                      (e.currentTarget.style.borderColor =
+                        "rgba(168, 85, 247, 0.8)")
+                    }
+                    onBlur={(e) =>
+                      (e.currentTarget.style.borderColor = "#222222")
+                    }
                   >
                     <option value="openai">OpenAI</option>
                     <option value="anthropic">Anthropic</option>
@@ -302,28 +303,26 @@ export default function CreateProjectModal({
                   <label
                     style={{
                       fontSize: "11px",
+                      fontFamily: "'JetBrains Mono', monospace",
                       fontWeight: 700,
-                      color: "#d4d4d8",
+                      color: "#71717a",
                       textTransform: "uppercase",
                       letterSpacing: "0.05em",
                     }}
                   >
-                    <span style={{ color: "#c084fc", marginRight: "6px" }}>
-                      &gt;
-                    </span>{" "}
                     PROVIDER API KEY
                   </label>
                   <span
                     style={{
                       fontSize: "10px",
-                      color: "#71717a",
+                      fontFamily: "'JetBrains Mono', monospace",
+                      color: "#34D399",
                       display: "flex",
                       alignItems: "center",
                       gap: "4px",
-                      marginLeft: "auto",
                     }}
                   >
-                    <Lock size={12} color="#34d399" /> AES-256
+                    <Lock size={12} color="#34D399" /> AES-256
                   </span>
                 </div>
                 <input
@@ -335,48 +334,55 @@ export default function CreateProjectModal({
                     width: "100%",
                     height: "42px",
                     padding: "0 14px",
-                    backgroundColor: "#141414",
-                    border: "1px solid #27272a",
+                    backgroundColor: "#171717",
+                    border: "1px solid #222222",
                     color: "#ffffff",
                     fontFamily: "'JetBrains Mono', monospace",
                     fontSize: "12px",
                     outline: "none",
                     boxSizing: "border-box",
                   }}
+                  onFocus={(e) =>
+                    (e.currentTarget.style.borderColor =
+                      "rgba(168, 85, 247, 0.8)")
+                  }
+                  onBlur={(e) =>
+                    (e.currentTarget.style.borderColor = "#222222")
+                  }
                 />
               </div>
 
-              {/* Guardrail Alert */}
+              {/* Guardrail Note Box */}
               <div
                 style={{
                   display: "flex",
                   alignItems: "flex-start",
                   gap: "10px",
                   padding: "12px 14px",
-                  backgroundColor: "rgba(88, 28, 135, 0.2)",
-                  border: "1px solid rgba(168, 85, 247, 0.3)",
+                  backgroundColor: "#171717",
+                  border: "1px solid #222222",
                   boxSizing: "border-box",
                   marginTop: "4px",
                 }}
               >
                 <ShieldAlert
-                  size={16}
-                  color="#c084fc"
+                  size={15}
+                  color="#C084FC"
                   style={{ flexShrink: 0, marginTop: "1px" }}
                 />
                 <span
                   style={{
                     fontSize: "11px",
-                    color: "#d4d4d8",
+                    color: "#8e8e8e",
                     lineHeight: 1.4,
                   }}
                 >
-                  Traffic automatically terminates if monthly spend exceeds
-                  configured caps.
+                  Real-time circuit breaker active: traffic automatically
+                  terminates if monthly spend exceeds caps.
                 </span>
               </div>
 
-              {/* Footer */}
+              {/* Footer Buttons */}
               <div
                 style={{
                   display: "flex",
@@ -385,7 +391,7 @@ export default function CreateProjectModal({
                   gap: "12px",
                   paddingTop: "16px",
                   marginTop: "8px",
-                  borderTop: "1px solid #27272a",
+                  borderTop: "1px solid #1f1f1f",
                 }}
               >
                 <button
@@ -393,34 +399,49 @@ export default function CreateProjectModal({
                   onClick={onClose}
                   style={{
                     padding: "10px 18px",
-                    fontSize: "11px",
-                    fontWeight: 700,
-                    color: "#a1a1aa",
+                    fontSize: "12px",
+                    fontFamily: "'JetBrains Mono', monospace",
+                    fontWeight: 600,
+                    color: "#8e8e8e",
                     backgroundColor: "transparent",
                     border: "none",
                     cursor: "pointer",
-                    letterSpacing: "0.05em",
-                    textTransform: "uppercase",
+                    transition: "color 0.2s ease",
                   }}
+                  onMouseEnter={(e) =>
+                    (e.currentTarget.style.color = "#ffffff")
+                  }
+                  onMouseLeave={(e) =>
+                    (e.currentTarget.style.color = "#8e8e8e")
+                  }
                 >
-                  CANCEL
+                  Cancel
                 </button>
                 <button
                   type="submit"
                   style={{
-                    padding: "10px 22px",
-                    fontSize: "11px",
-                    fontWeight: 700,
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    backgroundColor: "#141414",
+                    border: "1px solid #262626",
                     color: "#ffffff",
-                    backgroundColor: "#9333ea",
-                    border: "1px solid rgba(192, 132, 252, 0.4)",
+                    fontWeight: 600,
+                    fontSize: "13px",
+                    padding: "10px 20px",
                     cursor: "pointer",
-                    letterSpacing: "0.05em",
-                    textTransform: "uppercase",
-                    boxShadow: "0 4px 14px rgba(147, 51, 234, 0.4)",
+                    transition: "all 0.2s ease",
+                    boxShadow: "0 2px 8px rgba(0,0,0,0.4)",
                   }}
+                  onMouseEnter={(e) =>
+                    (e.currentTarget.style.borderColor =
+                      "rgba(168, 85, 247, 0.6)")
+                  }
+                  onMouseLeave={(e) =>
+                    (e.currentTarget.style.borderColor = "#262626")
+                  }
                 >
-                  CREATE PROJECT
+                  Create Project
                 </button>
               </div>
             </form>

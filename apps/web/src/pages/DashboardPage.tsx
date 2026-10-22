@@ -32,70 +32,172 @@ export default function DashboardPage() {
   };
 
   return (
-    <div className="w-full flex flex-col gap-8 pb-12">
-      {/* Page Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-zinc-800/80">
-        <div className="space-y-1 min-w-0">
-          <div className="flex items-center gap-2.5">
-            <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-white truncate">
+    <div
+      style={{
+        width: "100%",
+        maxWidth: "1080px",
+        margin: "0 auto",
+        padding: "12px 16px 80px 16px",
+        display: "flex",
+        flexDirection: "column",
+        gap: "32px",
+        boxSizing: "border-box",
+        userSelect: "none",
+      }}
+    >
+      {/* ── Page Header (Identical to Global Settings) ────────────────── */}
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "row",
+          flexWrap: "wrap",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: "16px",
+          paddingBottom: "24px",
+          borderBottom: "1px solid #222222",
+        }}
+      >
+        <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+            <h1
+              style={{
+                fontSize: "24px",
+                fontWeight: 700,
+                color: "#ffffff",
+                letterSpacing: "-0.02em",
+                margin: 0,
+              }}
+            >
               Projects
             </h1>
+            <span
+              style={{
+                fontSize: "11px",
+                fontFamily: "'JetBrains Mono', monospace",
+                fontWeight: 600,
+                color: "#a1a1aa",
+                backgroundColor: "#171717",
+                border: "1px solid #222222",
+                padding: "2px 8px",
+              }}
+            >
+              {projects.length}
+            </span>
           </div>
-          <p className="text-xs sm:text-sm text-zinc-400 truncate">
+          <p style={{ fontSize: "13px", color: "#8e8e8e", margin: 0 }}>
             Budget-protected LLM gateways, API keys, and rate-limit alerts.
           </p>
         </div>
 
-        {/* Action Button */}
+        {/* Clean Action Button (Matching Header Style) */}
         <button
           type="button"
           onClick={() => setIsModalOpen(true)}
-          className="group relative inline-flex items-center justify-center gap-2.5 bg-zinc-900 border border-zinc-800 hover:border-purple-500/60 text-zinc-200 hover:text-white font-medium text-xs sm:text-sm transition-all duration-200 shadow-md active:scale-[0.98] shrink-0 cursor-pointer rounded-none"
           style={{
-            paddingLeft: "14px",
-            paddingRight: "18px",
-            paddingTop: "9px",
-            paddingBottom: "9px",
+            display: "inline-flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: "8px",
+            backgroundColor: "#141414",
+            border: "1px solid #262626",
+            color: "#ffffff",
+            fontWeight: 600,
+            fontSize: "13px",
+            padding: "10px 20px",
+            cursor: "pointer",
+            transition: "all 0.2s ease",
+            boxShadow: "0 2px 8px rgba(0,0,0,0.4)",
           }}
+          onMouseEnter={(e) =>
+            (e.currentTarget.style.borderColor = "rgba(168, 85, 247, 0.6)")
+          }
+          onMouseLeave={(e) => (e.currentTarget.style.borderColor = "#262626")}
         >
-          <div className="flex items-center justify-center size-5 bg-purple-500/10 border border-purple-500/20 group-hover:bg-purple-500/20 group-hover:border-purple-500/40 transition-colors shrink-0 rounded-none">
-            <Plus className="size-3.5 text-purple-400 stroke-[2.5]" />
-          </div>
-          <span className="tracking-tight whitespace-nowrap font-semibold">
-            New Project
-          </span>
+          <Plus size={15} color="#C084FC" />
+          <span>New Project</span>
         </button>
       </div>
 
-      {/* Project Grid / Empty State */}
+      {/* ── Project Grid / Empty State Container ──────────────────────── */}
       {projects.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-20 border border-dashed border-zinc-800/80 bg-[#121212]/50 text-center px-4 mt-2 rounded-none">
-          <Sparkles className="size-8 text-zinc-600 mb-3" />
-          <p className="text-sm font-semibold text-zinc-300">
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "64px 24px",
+            backgroundColor: "#121212",
+            border: "1px dashed #222222",
+            textAlign: "center",
+            boxSizing: "border-box",
+            gap: "12px",
+          }}
+        >
+          <Sparkles size={32} color="#71717a" style={{ marginBottom: "4px" }} />
+          <p
+            style={{
+              fontSize: "14px",
+              fontWeight: 600,
+              color: "#ffffff",
+              margin: 0,
+            }}
+          >
             No projects created yet
           </p>
-          <p className="text-xs text-zinc-500 mt-1 mb-6 max-w-xs">
+          <p
+            style={{
+              fontSize: "12px",
+              color: "#71717a",
+              maxWidth: "320px",
+              lineHeight: 1.5,
+              margin: 0,
+            }}
+          >
             Create your first budget-protected LLM gateway to start managing
             usage.
           </p>
           <button
             type="button"
             onClick={() => setIsModalOpen(true)}
-            className="inline-flex items-center gap-2 px-4 py-2 text-xs sm:text-sm font-semibold rounded-none bg-white text-black hover:bg-zinc-200 transition-colors cursor-pointer"
+            style={{
+              marginTop: "12px",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "8px",
+              padding: "10px 20px",
+              fontSize: "12px",
+              fontFamily: "'JetBrains Mono', monospace",
+              fontWeight: 700,
+              color: "#000000",
+              backgroundColor: "#ffffff",
+              border: "none",
+              cursor: "pointer",
+              textTransform: "uppercase",
+              letterSpacing: "0.05em",
+            }}
           >
-            <Plus className="size-4" />
+            <Plus size={14} />
             New Project
           </button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 pt-2">
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))",
+            gap: "20px",
+            boxSizing: "border-box",
+          }}
+        >
           {projects.map((project) => (
             <ProjectCard key={project.id} />
           ))}
         </div>
       )}
 
-      {/* Separate Modal Component */}
+      {/* Create Project Modal Component */}
       <CreateProjectModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
