@@ -3,38 +3,56 @@ import { useParams, useNavigate, Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
   ShieldCheck,
-  Check,
-  Copy,
-  Terminal,
   ArrowRight,
   RefreshCw,
+  Key,
+  Cpu,
+  BarChart3,
+  Layers,
   Activity,
-  AlertTriangle,
 } from "lucide-react";
 import { useProjects } from "../../context/ProjectContext";
 
 export default function ProjectOverviewPage() {
   const { projectId } = useParams<{ projectId: string }>();
   const navigate = useNavigate();
-  const { projects, logs, resetBudgetUsage, addMockLog } = useProjects();
+  const { projects, logs, resetBudgetUsage } = useProjects();
 
   const project = projects.find((p) => p.id === projectId);
-  const projectLogs = projectId ? logs[projectId] ?? [] : [];
+  const projectLogs = projectId ? (logs[projectId] ?? []) : [];
 
-  const [copiedCode, setCopiedCode] = useState(false);
-  const [activeTab, setActiveTab] = useState<"curl" | "python" | "node">("curl");
-  const [simulating, setSimulating] = useState(false);
+  const [hoveredBar, setHoveredBar] = useState<number | null>(null);
 
   if (!project) {
     return (
-      <div className="max-w-4xl mx-auto px-4 py-16 text-center">
-        <h2 className="text-xl font-bold text-white">Project not found</h2>
-        <p className="mt-2 text-sm text-text-secondary">
-          The project <code className="text-brand">{projectId}</code> does not exist or has been removed.
+      <div
+        style={{
+          maxWidth: "800px",
+          margin: "0 auto",
+          padding: "64px 16px",
+          textAlign: "center",
+          fontFamily: "'JetBrains Mono', monospace",
+          color: "#ffffff",
+        }}
+      >
+        <h2 style={{ fontSize: "18px", fontWeight: 700 }}>Project not found</h2>
+        <p style={{ marginTop: "8px", fontSize: "13px", color: "#8e8e8e" }}>
+          The project <code style={{ color: "#c084fc" }}>{projectId}</code> does
+          not exist or has been removed.
         </p>
         <button
           onClick={() => navigate("/dashboard")}
-          className="mt-6 px-4 py-2 rounded-xl bg-white text-black font-semibold text-sm cursor-pointer"
+          style={{
+            marginTop: "24px",
+            padding: "10px 20px",
+            backgroundColor: "#ffffff",
+            color: "#000000",
+            fontWeight: 700,
+            fontSize: "12px",
+            border: "none",
+            cursor: "pointer",
+            textTransform: "uppercase",
+          }}
         >
           Return to Projects
         </button>
@@ -42,438 +60,852 @@ export default function ProjectOverviewPage() {
     );
   }
 
+  // 1. Current Spend vs Budget
   const percentUsed =
     project.monthly_budget > 0
       ? Math.min(100, (project.spend / project.monthly_budget) * 100)
       : 0;
 
-  const totalTokens = projectLogs.reduce(
-    (acc, l) => acc + l.prompt_tokens + l.completion_tokens,
-    0
-  );
-  const successfulCalls = projectLogs.filter((l) => l.status_code === 200).length;
+  // 2. Request breakdown
+  const successfulCalls = projectLogs.filter(
+    (l) => l.status_code === 200,
+  ).length;
   const blockedCalls = projectLogs.filter((l) => l.status_code === 429).length;
 
-  const getProviderConfig = () => {
-    switch (project.provider) {
-      case "openai":
-        return {
-          label: "OpenAI",
-          color: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
-          endpoint: "http://localhost:8080/v1/chat/completions",
-          model: "gpt-4o",
-        };
-      case "anthropic":
-        return {
-          label: "Anthropic Claude",
-          color: "bg-amber-500/10 text-amber-400 border-amber-500/20",
-          endpoint: "http://localhost:8080/anthropic/v1/messages",
-          model: "claude-3-7-sonnet",
-        };
-      case "gemini":
-        return {
-          label: "Google Gemini",
-          color: "bg-sky-500/10 text-sky-400 border-sky-500/20",
-          endpoint: "http://localhost:8080/v1beta/models/gemini-2.5-flash:generateContent",
-          model: "gemini-2.5-flash",
-        };
-    }
-  };
+  // 3. Token breakdown
+  const promptTokens = projectLogs.reduce(
+    (acc, l) => acc + (l.prompt_tokens || 0),
+    0,
+  );
+  const completionTokens = projectLogs.reduce(
+    (acc, l) => acc + (l.completion_tokens || 0),
+    0,
+  );
+  const totalTokens = promptTokens + completionTokens;
 
-  const providerCfg = getProviderConfig();
-  const sampleKey = `${project.key_prefix ?? "setu_live"}_demo99482`;
+  // 4. Provider Key status
+  const providerKeysStatus = [
+    { name: "OpenAI", configured: project.provider === "openai" },
+    { name: "Anthropic", configured: project.provider === "anthropic" },
+    { name: "Gemini", configured: project.provider === "gemini" },
+  ];
 
-  const getCodeSnippet = () => {
-    if (activeTab === "curl") {
-      if (project.provider === "openai") {
-        return `curl -X POST "${providerCfg.endpoint}" \\
-  -H "Content-Type: application/json" \\
-  -H "Authorization: Bearer ${sampleKey}" \\
-  -d '{
-    "model": "gpt-4o",
-    "messages": [{"role": "user", "content": "Hello Setu Gateway!"}]
-  }'`;
-      } else if (project.provider === "anthropic") {
-        return `curl -X POST "${providerCfg.endpoint}" \\
-  -H "Content-Type: application/json" \\
-  -H "x-api-key: ${sampleKey}" \\
-  -H "anthropic-version: 2023-06-01" \\
-  -d '{
-    "model": "claude-3-7-sonnet-20250219",
-    "max_tokens": 1024,
-    "messages": [{"role": "user", "content": "Hello Setu Claude Gateway!"}]
-  }'`;
-      } else {
-        return `curl -X POST "${providerCfg.endpoint}" \\
-  -H "Content-Type: application/json" \\
-  -H "x-goog-api-key: ${sampleKey}" \\
-  -d '{
-    "contents": [{"parts":[{"text": "Explain quantum computing in one sentence"}]}]
-  }'`;
-      }
-    } else if (activeTab === "python") {
-      return `import openai
+  // 5. Proxy Key status
+  const primaryKey = `${project.key_prefix ?? "setu_live"}_demo99482`;
+  const truncatedKey = `${primaryKey.slice(0, 10)}...${primaryKey.slice(-4)}`;
 
-client = openai.OpenAI(
-    base_url="http://localhost:8080/v1",
-    api_key="${sampleKey}"
-)
-
-response = client.chat.completions.create(
-    model="${providerCfg.model}",
-    messages=[{"role": "user", "content": "Hello via Setu Budget Gateway!"}]
-)
-
-print(response.choices[0].message.content)`;
-    } else {
-      return `import { OpenAI } from 'openai';
-
-const openai = new OpenAI({
-  baseURL: 'http://localhost:8080/v1',
-  apiKey: '${sampleKey}',
-});
-
-async function main() {
-  const completion = await openai.chat.completions.create({
-    messages: [{ role: 'user', content: 'Say hello!' }],
-    model: '${providerCfg.model}',
+  // Hourly volume distribution mock generator (24-hour cycle)
+  const volumeData = Array.from({ length: 12 }, (_, i) => {
+    const hourLabel = `${(i * 2).toString().padStart(2, "0")}:00`;
+    const count = Math.floor(Math.sin(i) * 15 + 20 + (i % 3) * 8);
+    return { hour: hourLabel, count };
   });
-
-  console.log(completion.choices[0].message.content);
-}
-
-main();`;
-    }
-  };
-
-  const handleCopyCode = () => {
-    navigator.clipboard.writeText(getCodeSnippet());
-    setCopiedCode(true);
-    setTimeout(() => setCopiedCode(false), 2000);
-  };
-
-  const handleSimulateRequest = (status: number) => {
-    setSimulating(true);
-    setTimeout(() => {
-      addMockLog(project.id, status);
-      setSimulating(false);
-    }, 400);
-  };
+  const maxVolume = Math.max(...volumeData.map((d) => d.count), 1);
 
   return (
-    <div className="max-w-6xl mx-auto px-4 sm:px-6 md:px-8 py-8 space-y-8">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-6 border-b border-border/80">
-        <div>
-          <div className="flex items-center gap-2 text-xs font-medium text-text-muted mb-1">
-            <Link to="/dashboard" className="hover:text-white transition-colors">
+    <motion.div
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.25, ease: "easeOut" }}
+      style={{
+        width: "100%",
+        maxWidth: "1080px",
+        margin: "0 auto",
+        padding: "12px 16px 80px 16px",
+        display: "flex",
+        flexDirection: "column",
+        gap: "32px",
+        boxSizing: "border-box",
+        userSelect: "none",
+      }}
+    >
+      {/* ── Header ─────────────────────────────────────────────────── */}
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "row",
+          flexWrap: "wrap",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: "16px",
+          paddingBottom: "24px",
+          borderBottom: "1px solid #222222",
+        }}
+      >
+        <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "8px",
+              fontSize: "12px",
+              color: "#8e8e8e",
+            }}
+          >
+            <Link
+              to="/dashboard"
+              style={{ color: "#8e8e8e", textDecoration: "none" }}
+            >
               Projects
             </Link>
             <span>/</span>
-            <span className="text-white">{project.name}</span>
+            <span style={{ color: "#ffffff", fontWeight: 600 }}>
+              {project.name}
+            </span>
           </div>
-          <div className="flex items-center gap-3 mt-1">
-            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-white">
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "12px",
+              marginTop: "4px",
+            }}
+          >
+            <h1
+              style={{
+                fontSize: "24px",
+                fontWeight: 700,
+                color: "#ffffff",
+                letterSpacing: "-0.02em",
+                margin: 0,
+              }}
+            >
               {project.name}
             </h1>
             <span
-              className={`text-xs font-medium px-2.5 py-0.5 rounded-full border ${providerCfg.color}`}
+              style={{
+                fontSize: "11px",
+                fontFamily: "'JetBrains Mono', monospace",
+                fontWeight: 600,
+                color: "#34D399",
+                backgroundColor: "rgba(52, 211, 153, 0.1)",
+                border: "1px solid rgba(52, 211, 153, 0.3)",
+                padding: "2px 8px",
+              }}
             >
-              {providerCfg.label}
+              {project.provider.toUpperCase()}
             </span>
           </div>
-          <p className="mt-1 text-sm text-text-secondary">
-            ID: <code className="font-mono text-xs text-text-muted">{project.id}</code> · Key Prefix:{" "}
-            <code className="font-mono text-xs text-text-muted">{project.key_prefix ?? "setu_live"}</code>
+          <p
+            style={{
+              fontSize: "12px",
+              fontFamily: "'JetBrains Mono', monospace",
+              color: "#71717a",
+              margin: 0,
+            }}
+          >
+            ID: {project.id} · Prefix: {project.key_prefix ?? "setu_live"}
           </p>
         </div>
 
-        {/* Quick Actions */}
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => handleSimulateRequest(200)}
-            disabled={simulating}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-surface border border-border text-xs font-medium text-white hover:bg-surface-elevated transition-colors cursor-pointer"
-          >
-            <Activity className="size-3.5 text-emerald-400" />
-            <span>Simulate 200 OK</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => handleSimulateRequest(429)}
-            disabled={simulating}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-surface border border-border text-xs font-medium text-white hover:bg-surface-elevated transition-colors cursor-pointer"
-          >
-            <AlertTriangle className="size-3.5 text-red-400" />
-            <span>Simulate 429 Cap</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => resetBudgetUsage(project.id)}
-            title="Reset spend usage to $0.00"
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-surface border border-border text-xs font-medium text-text-secondary hover:text-white hover:bg-surface-elevated transition-colors cursor-pointer"
-          >
-            <RefreshCw className="size-3.5" />
-            <span>Reset Spend</span>
-          </button>
-        </div>
+        {/* Header Reset Button - Uniform Action Styling */}
+        <button
+          type="button"
+          onClick={() => resetBudgetUsage(project.id)}
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: "8px",
+            backgroundColor: "#141414",
+            border: "1px solid #262626",
+            color: "#ffffff",
+            fontWeight: 600,
+            fontSize: "13px",
+            padding: "10px 20px",
+            cursor: "pointer",
+            transition: "all 0.2s ease",
+            boxShadow: "0 2px 8px rgba(0,0,0,0.4)",
+          }}
+          onMouseEnter={(e) =>
+            (e.currentTarget.style.borderColor = "rgba(168, 85, 247, 0.6)")
+          }
+          onMouseLeave={(e) => (e.currentTarget.style.borderColor = "#262626")}
+        >
+          <RefreshCw size={15} color="#C084FC" />
+          <span>Reset Usage</span>
+        </button>
       </div>
 
-      {/* Main Budget Progress Card */}
-      <div className="p-6 sm:p-8 rounded-2xl bg-surface border border-border relative overflow-hidden">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+      {/* ── Metric 1: Monthly Spend Utilization ─────────────────────── */}
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3 }}
+        style={{
+          backgroundColor: "#121212",
+          border: "1px solid #222222",
+          padding: "28px",
+          display: "flex",
+          flexDirection: "column",
+          gap: "20px",
+          boxSizing: "border-box",
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "flex-start",
+          }}
+        >
           <div>
-            <span className="text-xs font-medium uppercase tracking-wider text-text-muted">
-              Monthly Budget Utilization
+            <span
+              style={{
+                fontSize: "11px",
+                fontFamily: "'JetBrains Mono', monospace",
+                fontWeight: 700,
+                color: "#71717a",
+                letterSpacing: "0.08em",
+                textTransform: "uppercase",
+              }}
+            >
+              MONTHLY SPEND UTILIZATION (redis:GetSpend)
             </span>
-            <div className="flex items-baseline gap-3 mt-2">
-              <span className="text-3xl sm:text-4xl font-bold font-mono text-white">
-                ${project.spend < 0.01 ? project.spend.toFixed(6) : project.spend.toFixed(4)}
+            <div
+              style={{
+                display: "flex",
+                alignItems: "baseline",
+                gap: "12px",
+                marginTop: "8px",
+              }}
+            >
+              <span
+                style={{
+                  fontSize: "32px",
+                  fontWeight: 700,
+                  fontFamily: "'JetBrains Mono', monospace",
+                  color: "#ffffff",
+                }}
+              >
+                ${project.spend.toFixed(2)}
               </span>
-              <span className="text-sm font-mono text-text-muted">
-                / ${project.monthly_budget < 0.01 ? project.monthly_budget.toFixed(6) : project.monthly_budget.toFixed(2)} limit
+              <span
+                style={{
+                  fontSize: "14px",
+                  fontFamily: "'JetBrains Mono', monospace",
+                  color: "#71717a",
+                }}
+              >
+                / ${project.monthly_budget.toFixed(2)} LIMIT
               </span>
             </div>
-            <p className="text-xs text-text-secondary mt-1">
-              {percentUsed >= 100
-                ? "⚠️ Monthly budget limit reached! Inbound requests will receive 429."
-                : percentUsed >= 80
-                ? "⚠️ Warning: Spend is above 80% threshold."
-                : "Protected by Setu atomic Redis quota enforcer."}
-            </p>
           </div>
 
-          <div className="text-right">
-            <span className="text-2xl font-bold font-mono text-white">
+          <div style={{ textAlign: "right" }}>
+            <span
+              style={{
+                fontSize: "24px",
+                fontWeight: 700,
+                fontFamily: "'JetBrains Mono', monospace",
+                color: percentUsed >= 90 ? "#f87171" : "#34D399",
+              }}
+            >
               {percentUsed.toFixed(1)}%
             </span>
-            <span className="text-xs text-text-muted block">used this cycle</span>
+            <span
+              style={{
+                fontSize: "11px",
+                fontFamily: "'JetBrains Mono', monospace",
+                color: "#71717a",
+                display: "block",
+              }}
+            >
+              CAPACITY USED
+            </span>
           </div>
         </div>
 
-        {/* Big Progress Bar */}
-        <div className="w-full h-3 rounded-full bg-white/10 mt-6 overflow-hidden">
+        {/* Animated Progress Bar */}
+        <div
+          style={{
+            width: "100%",
+            height: "8px",
+            backgroundColor: "#171717",
+            border: "1px solid #222222",
+          }}
+        >
           <motion.div
             initial={{ width: 0 }}
             animate={{ width: `${percentUsed}%` }}
             transition={{ duration: 0.6, ease: "easeOut" }}
-            className={`h-full rounded-full transition-colors ${
-              percentUsed >= 95
-                ? "bg-red-500"
-                : percentUsed >= 75
-                ? "bg-amber-400"
-                : "bg-emerald-400"
-            }`}
+            style={{
+              height: "100%",
+              backgroundColor: percentUsed >= 90 ? "#f87171" : "#34D399",
+            }}
           />
         </div>
 
-        <div className="flex items-center justify-between mt-3 text-xs text-text-muted">
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            fontSize: "11px",
+            fontFamily: "'JetBrains Mono', monospace",
+            color: "#71717a",
+          }}
+        >
           <span>$0.00</span>
           <span>
-            Remaining: $
-            {Math.max(0, project.monthly_budget - project.spend).toFixed(
-              project.monthly_budget < 0.01 ? 6 : 4
-            )}
+            REMAINING: ${(project.monthly_budget - project.spend).toFixed(2)}
           </span>
-          <span>
-            ${project.monthly_budget < 0.01 ? project.monthly_budget.toFixed(6) : project.monthly_budget.toFixed(2)}
-          </span>
+          <span>${project.monthly_budget.toFixed(2)}</span>
         </div>
-      </div>
+      </motion.div>
 
-      {/* Metrics Row */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="p-5 rounded-2xl bg-surface border border-border">
-          <span className="text-xs font-medium uppercase tracking-wider text-text-muted">
-            Total Requests
-          </span>
-          <p className="mt-2 text-2xl font-bold font-mono text-white">
-            {projectLogs.length}
-          </p>
-          <span className="text-xs text-text-muted mt-1 block">
-            {successfulCalls} OK · {blockedCalls} 429 Blocked
-          </span>
-        </div>
-
-        <div className="p-5 rounded-2xl bg-surface border border-border">
-          <span className="text-xs font-medium uppercase tracking-wider text-text-muted">
-            Tokens Processed
-          </span>
-          <p className="mt-2 text-2xl font-bold font-mono text-white">
-            {totalTokens.toLocaleString()}
-          </p>
-          <span className="text-xs text-text-muted mt-1 block">
-            Zero-copy token counter
-          </span>
-        </div>
-
-        <div className="p-5 rounded-2xl bg-surface border border-border">
-          <span className="text-xs font-medium uppercase tracking-wider text-text-muted">
-            Average Cost / Req
-          </span>
-          <p className="mt-2 text-2xl font-bold font-mono text-white">
-            $
-            {successfulCalls > 0
-              ? (project.spend / successfulCalls).toFixed(6)
-              : "0.000000"}
-          </p>
-          <span className="text-xs text-text-muted mt-1 block">
-            Accurate upstream pricing
-          </span>
-        </div>
-
-        <div className="p-5 rounded-2xl bg-surface border border-border">
-          <span className="text-xs font-medium uppercase tracking-wider text-text-muted">
-            Quota Enforcement
-          </span>
-          <div className="flex items-center gap-2 mt-2">
-            <ShieldCheck className="size-5 text-emerald-400" />
-            <span className="text-base font-semibold text-white">Active</span>
-          </div>
-          <span className="text-xs text-text-muted mt-1 block">
-            Atomic Redis pipeline check
-          </span>
-        </div>
-      </div>
-
-      {/* Interactive Code Integration Snippet */}
-      <div className="p-6 rounded-2xl bg-surface border border-border">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-border/60">
-          <div className="flex items-center gap-3">
-            <div className="size-8 rounded-lg bg-white/10 flex items-center justify-center text-white">
-              <Terminal className="size-4" />
-            </div>
-            <div>
-              <h3 className="text-sm font-semibold text-white">
-                Quick Integration
-              </h3>
-              <p className="text-xs text-text-secondary">
-                Point your app to Setu gateway using your project credentials.
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <div className="flex rounded-xl bg-[#141414] p-1 border border-border/80">
-              <button
-                type="button"
-                onClick={() => setActiveTab("curl")}
-                className={`px-3 py-1 rounded-lg text-xs font-medium cursor-pointer transition-colors ${
-                  activeTab === "curl"
-                    ? "bg-white text-black font-semibold"
-                    : "text-text-muted hover:text-white"
-                }`}
-              >
-                cURL
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveTab("python")}
-                className={`px-3 py-1 rounded-lg text-xs font-medium cursor-pointer transition-colors ${
-                  activeTab === "python"
-                    ? "bg-white text-black font-semibold"
-                    : "text-text-muted hover:text-white"
-                }`}
-              >
-                Python
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveTab("node")}
-                className={`px-3 py-1 rounded-lg text-xs font-medium cursor-pointer transition-colors ${
-                  activeTab === "node"
-                    ? "bg-white text-black font-semibold"
-                    : "text-text-muted hover:text-white"
-                }`}
-              >
-                Node.js
-              </button>
-            </div>
-
-            <button
-              type="button"
-              onClick={handleCopyCode}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/10 text-white text-xs font-medium hover:bg-white/15 transition-colors cursor-pointer"
-            >
-              {copiedCode ? (
-                <>
-                  <Check className="size-3.5 text-emerald-400" />
-                  <span className="text-emerald-400">Copied</span>
-                </>
-              ) : (
-                <>
-                  <Copy className="size-3.5" />
-                  <span>Copy</span>
-                </>
-              )}
-            </button>
-          </div>
-        </div>
-
-        <div className="mt-4 rounded-xl bg-[#0f0f0f] border border-border/60 p-4 font-mono text-xs text-text-primary overflow-x-auto">
-          <pre>{getCodeSnippet()}</pre>
-        </div>
-      </div>
-
-      {/* Recent Logs Preview */}
-      <div className="p-6 rounded-2xl bg-surface border border-border">
-        <div className="flex items-center justify-between pb-4 border-b border-border/60">
+      {/* ── Metrics Grid (2, 3, 4, 5) ─────────────────────────────────── */}
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
+          gap: "20px",
+        }}
+      >
+        {/* Metric 2: Request Breakdown */}
+        <motion.div
+          whileHover={{ y: -2 }}
+          transition={{ duration: 0.15 }}
+          style={{
+            padding: "20px",
+            backgroundColor: "#121212",
+            border: "1px solid #222222",
+            display: "flex",
+            flexDirection: "column",
+            justifyContent: "space-between",
+            gap: "16px",
+            boxSizing: "border-box",
+          }}
+        >
           <div>
-            <h3 className="text-sm font-semibold text-white">Recent Requests</h3>
-            <p className="text-xs text-text-secondary">
-              Latest incoming calls routed through this project.
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                marginBottom: "8px",
+              }}
+            >
+              <span
+                style={{
+                  fontSize: "11px",
+                  fontFamily: "'JetBrains Mono', monospace",
+                  fontWeight: 700,
+                  color: "#71717a",
+                }}
+              >
+                REQUEST BREAKDOWN
+              </span>
+              <BarChart3 size={15} color="#71717a" />
+            </div>
+            <p
+              style={{
+                fontSize: "24px",
+                fontWeight: 700,
+                fontFamily: "'JetBrains Mono', monospace",
+                color: "#ffffff",
+                margin: 0,
+              }}
+            >
+              {projectLogs.length}
             </p>
           </div>
+
+          <div
+            style={{
+              paddingTop: "12px",
+              borderTop: "1px solid #1f1f1f",
+              display: "flex",
+              justifyContent: "space-between",
+              fontSize: "11px",
+              fontFamily: "'JetBrains Mono', monospace",
+            }}
+          >
+            <span style={{ color: "#34D399" }}>{successfulCalls} 200 OK</span>
+            <span style={{ color: "#f87171" }}>{blockedCalls} 429 BLOCKED</span>
+          </div>
+        </motion.div>
+
+        {/* Metric 3: Token Consumption */}
+        <motion.div
+          whileHover={{ y: -2 }}
+          transition={{ duration: 0.15 }}
+          style={{
+            padding: "20px",
+            backgroundColor: "#121212",
+            border: "1px solid #222222",
+            display: "flex",
+            flexDirection: "column",
+            justifyContent: "space-between",
+            gap: "16px",
+            boxSizing: "border-box",
+          }}
+        >
+          <div>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                marginBottom: "8px",
+              }}
+            >
+              <span
+                style={{
+                  fontSize: "11px",
+                  fontFamily: "'JetBrains Mono', monospace",
+                  fontWeight: 700,
+                  color: "#71717a",
+                }}
+              >
+                TOKEN CONSUMPTION
+              </span>
+              <Layers size={15} color="#71717a" />
+            </div>
+            <p
+              style={{
+                fontSize: "24px",
+                fontWeight: 700,
+                fontFamily: "'JetBrains Mono', monospace",
+                color: "#ffffff",
+                margin: 0,
+              }}
+            >
+              {totalTokens.toLocaleString()}
+            </p>
+          </div>
+
+          <div
+            style={{
+              paddingTop: "12px",
+              borderTop: "1px solid #1f1f1f",
+              display: "flex",
+              justifyContent: "space-between",
+              fontSize: "10px",
+              fontFamily: "'JetBrains Mono', monospace",
+              color: "#71717a",
+            }}
+          >
+            <span>PROMPT: {promptTokens.toLocaleString()}</span>
+            <span>COMPL: {completionTokens.toLocaleString()}</span>
+          </div>
+        </motion.div>
+
+        {/* Metric 4: Active Provider Keys */}
+        <motion.div
+          whileHover={{ y: -2 }}
+          transition={{ duration: 0.15 }}
+          style={{
+            padding: "20px",
+            backgroundColor: "#121212",
+            border: "1px solid #222222",
+            display: "flex",
+            flexDirection: "column",
+            justifyContent: "space-between",
+            gap: "16px",
+            boxSizing: "border-box",
+          }}
+        >
+          <div>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                marginBottom: "8px",
+              }}
+            >
+              <span
+                style={{
+                  fontSize: "11px",
+                  fontFamily: "'JetBrains Mono', monospace",
+                  fontWeight: 700,
+                  color: "#71717a",
+                }}
+              >
+                PROVIDER INTEGRATIONS
+              </span>
+              <Cpu size={15} color="#71717a" />
+            </div>
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: "6px",
+                marginTop: "6px",
+              }}
+            >
+              {providerKeysStatus.map((p) => (
+                <div
+                  key={p.name}
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    fontSize: "11px",
+                    fontFamily: "'JetBrains Mono', monospace",
+                  }}
+                >
+                  <span style={{ color: "#ffffff" }}>{p.name}</span>
+                  <span
+                    style={{
+                      color: p.configured ? "#34D399" : "#71717a",
+                      fontWeight: 600,
+                    }}
+                  >
+                    {p.configured ? "CONFIGURED" : "MISSING"}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div
+            style={{
+              paddingTop: "12px",
+              borderTop: "1px solid #1f1f1f",
+              fontSize: "10px",
+              fontFamily: "'JetBrains Mono', monospace",
+              color: "#71717a",
+            }}
+          >
+            TABLE: provider_keys
+          </div>
+        </motion.div>
+
+        {/* Metric 5: Primary Proxy API Key Status */}
+        <motion.div
+          whileHover={{ y: -2 }}
+          transition={{ duration: 0.15 }}
+          style={{
+            padding: "20px",
+            backgroundColor: "#121212",
+            border: "1px solid #222222",
+            display: "flex",
+            flexDirection: "column",
+            justifyContent: "space-between",
+            gap: "16px",
+            boxSizing: "border-box",
+          }}
+        >
+          <div>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                marginBottom: "8px",
+              }}
+            >
+              <span
+                style={{
+                  fontSize: "11px",
+                  fontFamily: "'JetBrains Mono', monospace",
+                  fontWeight: 700,
+                  color: "#71717a",
+                }}
+              >
+                PRIMARY PROXY KEY
+              </span>
+              <Key size={15} color="#71717a" />
+            </div>
+            <p
+              style={{
+                fontSize: "13px",
+                fontWeight: 700,
+                fontFamily: "'JetBrains Mono', monospace",
+                color: "#ffffff",
+                margin: "4px 0",
+              }}
+            >
+              {truncatedKey}
+            </p>
+            <span
+              style={{
+                fontSize: "11px",
+                fontFamily: "'JetBrains Mono', monospace",
+                color: "#34D399",
+                fontWeight: 600,
+              }}
+            >
+              STATUS: ACTIVE
+            </span>
+          </div>
+
+          <div
+            style={{
+              paddingTop: "12px",
+              borderTop: "1px solid #1f1f1f",
+              fontSize: "10px",
+              fontFamily: "'JetBrains Mono', monospace",
+              color: "#71717a",
+            }}
+          >
+            LAST USED: JUST NOW
+          </div>
+        </motion.div>
+      </div>
+
+      {/* ── Request Volume Bar Graph (Replacing cURL box) ───────────── */}
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.35, delay: 0.1 }}
+        style={{
+          backgroundColor: "#121212",
+          border: "1px solid #222222",
+          padding: "28px",
+          display: "flex",
+          flexDirection: "column",
+          gap: "24px",
+          boxSizing: "border-box",
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            paddingBottom: "16px",
+            borderBottom: "1px solid #1f1f1f",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+            <Activity size={16} color="#C084FC" />
+            <h3
+              style={{
+                fontSize: "12px",
+                fontFamily: "'JetBrains Mono', monospace",
+                fontWeight: 700,
+                color: "#ffffff",
+                margin: 0,
+                textTransform: "uppercase",
+              }}
+            >
+              HOURLY REQUEST VOLUME
+            </h3>
+          </div>
+          <span
+            style={{
+              fontSize: "11px",
+              fontFamily: "'JetBrains Mono', monospace",
+              color: "#71717a",
+            }}
+          >
+            24H REALTIME METRICS
+          </span>
+        </div>
+
+        {/* Bar Chart Graphics */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "flex-end",
+            justifyContent: "space-between",
+            height: "140px",
+            gap: "12px",
+            paddingTop: "20px",
+          }}
+        >
+          {volumeData.map((item, idx) => {
+            const heightPercent = (item.count / maxVolume) * 100;
+            const isHovered = hoveredBar === idx;
+
+            return (
+              <div
+                key={item.hour}
+                onMouseEnter={() => setHoveredBar(idx)}
+                onMouseLeave={() => setHoveredBar(null)}
+                style={{
+                  flex: 1,
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  height: "100%",
+                  justifyContent: "flex-end",
+                  position: "relative",
+                  cursor: "pointer",
+                }}
+              >
+                {/* Tooltip */}
+                {isHovered && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 4 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    style={{
+                      position: "absolute",
+                      top: "-28px",
+                      backgroundColor: "#171717",
+                      border: "1px solid #3f3f46",
+                      padding: "2px 8px",
+                      fontSize: "10px",
+                      fontFamily: "'JetBrains Mono', monospace",
+                      color: "#34D399",
+                      whiteSpace: "nowrap",
+                      zIndex: 10,
+                    }}
+                  >
+                    {item.count} reqs
+                  </motion.div>
+                )}
+
+                {/* Bar */}
+                <motion.div
+                  initial={{ height: 0 }}
+                  animate={{ height: `${heightPercent}%` }}
+                  transition={{ duration: 0.4, delay: idx * 0.03 }}
+                  style={{
+                    width: "100%",
+                    maxWidth: "28px",
+                    backgroundColor: isHovered ? "#C084FC" : "#34D399",
+                    opacity: isHovered ? 1 : 0.75,
+                    transition:
+                      "background-color 0.15s ease, opacity 0.15s ease",
+                  }}
+                />
+
+                <span
+                  style={{
+                    fontSize: "10px",
+                    fontFamily: "'JetBrains Mono', monospace",
+                    color: "#71717a",
+                    marginTop: "8px",
+                  }}
+                >
+                  {item.hour}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      </motion.div>
+
+      {/* ── Recent Requests Log Preview ────────────────────────────── */}
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.35, delay: 0.15 }}
+        style={{
+          backgroundColor: "#121212",
+          border: "1px solid #222222",
+          padding: "28px",
+          display: "flex",
+          flexDirection: "column",
+          gap: "20px",
+          boxSizing: "border-box",
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            paddingBottom: "16px",
+            borderBottom: "1px solid #1f1f1f",
+          }}
+        >
+          <h3
+            style={{
+              fontSize: "12px",
+              fontFamily: "'JetBrains Mono', monospace",
+              fontWeight: 700,
+              color: "#ffffff",
+              margin: 0,
+              textTransform: "uppercase",
+            }}
+          >
+            RECENT REQUEST LOGS (usage_logs)
+          </h3>
           <Link
             to={`/dashboard/project/${project.id}/logs`}
-            className="flex items-center gap-1 text-xs text-white hover:text-brand transition-colors font-medium"
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "6px",
+              fontSize: "11px",
+              fontFamily: "'JetBrains Mono', monospace",
+              color: "#34D399",
+              textDecoration: "none",
+              fontWeight: 600,
+            }}
           >
-            <span>View All Logs</span>
-            <ArrowRight className="size-3.5" />
+            <span>VIEW ALL LOGS</span>
+            <ArrowRight size={14} />
           </Link>
         </div>
 
         {projectLogs.length === 0 ? (
-          <div className="py-8 text-center text-xs text-text-muted">
-            No requests logged yet. Use the "Simulate 200 OK" button above to test!
+          <div
+            style={{
+              padding: "24px 0",
+              textAlign: "center",
+              fontSize: "12px",
+              fontFamily: "'JetBrains Mono', monospace",
+              color: "#71717a",
+            }}
+          >
+            No requests logged yet. Real-time proxy traffic will populate here
+            automatically.
           </div>
         ) : (
-          <div className="mt-4 divide-y divide-border/40">
+          <div
+            style={{ display: "flex", flexDirection: "column", gap: "12px" }}
+          >
             {projectLogs.slice(0, 4).map((log) => (
-              <div
+              <motion.div
                 key={log.id}
-                className="py-3 flex items-center justify-between text-xs"
+                whileHover={{ x: 2 }}
+                transition={{ duration: 0.15 }}
+                style={{
+                  padding: "12px 16px",
+                  backgroundColor: "#171717",
+                  border: "1px solid #222222",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  fontSize: "12px",
+                  fontFamily: "'JetBrains Mono', monospace",
+                }}
               >
-                <div className="flex items-center gap-3">
+                <div
+                  style={{ display: "flex", alignItems: "center", gap: "12px" }}
+                >
                   <span
-                    className={`font-mono font-semibold px-2 py-0.5 rounded text-[11px] ${
-                      log.status_code === 200
-                        ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
-                        : "bg-red-500/10 text-red-400 border border-red-500/20"
-                    }`}
+                    style={{
+                      padding: "2px 8px",
+                      fontWeight: 700,
+                      backgroundColor:
+                        log.status_code === 200
+                          ? "rgba(52, 211, 153, 0.1)"
+                          : "rgba(248, 113, 113, 0.1)",
+                      color: log.status_code === 200 ? "#34D399" : "#f87171",
+                      border:
+                        log.status_code === 200
+                          ? "1px solid rgba(52, 211, 153, 0.3)"
+                          : "1px solid rgba(248, 113, 113, 0.3)",
+                    }}
                   >
                     {log.status_code}
                   </span>
-                  <span className="font-mono text-white">{log.model}</span>
-                  <span className="text-text-muted">
+                  <span style={{ color: "#ffffff", fontWeight: 600 }}>
+                    {log.model}
+                  </span>
+                  <span style={{ color: "#71717a" }}>
                     {log.prompt_tokens + log.completion_tokens} tokens
                   </span>
                 </div>
 
-                <div className="flex items-center gap-4">
-                  <span className="font-mono text-white">
+                <div
+                  style={{ display: "flex", alignItems: "center", gap: "16px" }}
+                >
+                  <span style={{ color: "#ffffff", fontWeight: 600 }}>
                     ${log.cost_usd.toFixed(6)}
                   </span>
-                  <span className="text-text-muted">{log.created_at}</span>
+                  <span style={{ color: "#71717a" }}>{log.created_at}</span>
                 </div>
-              </div>
+              </motion.div>
             ))}
           </div>
         )}
-      </div>
-    </div>
+      </motion.div>
+    </motion.div>
   );
 }
