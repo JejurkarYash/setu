@@ -1,11 +1,29 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
-import type { Project, ApiKey, UsageLog, AlertSetting, Provider } from "../types";
+import type { Project, ApiKey, UsageLog, Provider } from "../types";
 import {
   initialProjects,
   sampleApiKeys,
   sampleLogs,
   sampleAlerts,
 } from "../data/mockData";
+
+export interface NotificationChannel {
+  id: string;
+  type: "slack" | "email";
+  webhookUrl?: string;
+  emailAddress?: string;
+  enabled: boolean;
+}
+
+export interface AlertSetting {
+  id: string;
+  project_id: string;
+  enabled: boolean;
+  trigger_threshold_pct: number;
+  channels: NotificationChannel[];
+  notify_slack?: boolean;
+  created_at: string;
+}
 
 interface ProjectContextType {
   projects: Project[];
@@ -24,7 +42,7 @@ interface ProjectContextType {
   generateApiKey: (projectId: string) => ApiKey & { rawSecret: string };
   revokeApiKey: (projectId: string, keyId: string) => void;
   saveAlert: (projectId: string, alertData: Partial<AlertSetting>) => void;
-  addMockLog: (projectId: string, status?: number) => void;
+  addMockLog: (projectId: string, statusCode?: number) => void;
 }
 
 const ProjectContext = createContext<ProjectContextType | undefined>(undefined);
@@ -76,10 +94,10 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({
     } catch (e) {
       console.error("Failed to load alerts from storage", e);
     }
-    return sampleAlerts;
+    return sampleAlerts as unknown as Record<string, AlertSetting>;
   });
 
-  // Sync to local storage
+  // Sync state to LocalStorage
   useEffect(() => {
     try {
       localStorage.setItem(STORAGE_KEYS.PROJECTS, JSON.stringify(projects));
@@ -142,7 +160,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({
 
     setProjects((prev) => [newProject, ...prev]);
 
-    // Initialize default API key for project
+    // Initialize initial API key
     const newKey: ApiKey = {
       id: `key-${Date.now()}`,
       project_id: uniqueId,
@@ -157,14 +175,23 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({
       [uniqueId]: [newKey],
     }));
 
-    // Initialize default alert
+    // Initialize default alert state (disabled by default)
     setAlerts((prev) => ({
       ...prev,
       [uniqueId]: {
         id: `alert-${Date.now()}`,
         project_id: uniqueId,
+        enabled: false,
         trigger_threshold_pct: 80,
-        notify_slack: false,
+        channels: [
+          {
+            id: `slack-${Date.now()}`,
+            type: "slack",
+            webhookUrl:
+              "https://hooks.slack.com/services/T000/B000/XXXXXXXXXXXXXXXXXXXX",
+            enabled: true,
+          },
+        ],
         created_at: new Date().toISOString(),
       },
     }));
@@ -174,13 +201,13 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const updateProject = (id: string, updates: Partial<Project>) => {
     setProjects((prev) =>
-      prev.map((p) => (p.id === id ? { ...p, ...updates } : p))
+      prev.map((p) => (p.id === id ? { ...p, ...updates } : p)),
     );
   };
 
   const resetBudgetUsage = (id: string) => {
     setProjects((prev) =>
-      prev.map((p) => (p.id === id ? { ...p, spend: 0 } : p))
+      prev.map((p) => (p.id === id ? { ...p, spend: 0 } : p)),
     );
   };
 
@@ -203,9 +230,12 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({
     });
   };
 
+  // Generate / Rotate API Key (Enforces single active key rule)
   const generateApiKey = (projectId: string) => {
     const project = projects.find((p) => p.id === projectId);
-    const prefix = project?.key_prefix ?? `setu_live_${Math.random().toString(36).substring(2, 7)}`;
+    const prefix =
+      project?.key_prefix ??
+      `setu_live_${Math.random().toString(36).substring(2, 7)}`;
     const randomSuffix = Math.random().toString(36).substring(2, 14);
     const rawSecret = `${prefix}_${randomSuffix}`;
 
@@ -218,10 +248,17 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({
       last_used_at: undefined,
     };
 
-    setApiKeys((prev) => ({
-      ...prev,
-      [projectId]: [newKey, ...(prev[projectId] ?? [])],
-    }));
+    // Invalidate previous active keys upon rotation
+    setApiKeys((prev) => {
+      const existing = (prev[projectId] ?? []).map((k) => ({
+        ...k,
+        is_active: false,
+      }));
+      return {
+        ...prev,
+        [projectId]: [newKey, ...existing],
+      };
+    });
 
     return { ...newKey, rawSecret };
   };
@@ -230,20 +267,22 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({
     setApiKeys((prev) => ({
       ...prev,
       [projectId]: (prev[projectId] ?? []).map((k) =>
-        k.id === keyId ? { ...k, is_active: false } : k
+        k.id === keyId ? { ...k, is_active: false } : k,
       ),
     }));
   };
 
   const saveAlert = (projectId: string, alertData: Partial<AlertSetting>) => {
     setAlerts((prev) => {
-      const existing = prev[projectId] ?? {
+      const existing: AlertSetting = prev[projectId] ?? {
         id: `alert-${Date.now()}`,
         project_id: projectId,
+        enabled: false,
         trigger_threshold_pct: 80,
-        notify_slack: false,
+        channels: [],
         created_at: new Date().toISOString(),
       };
+
       return {
         ...prev,
         [projectId]: { ...existing, ...alertData },
@@ -257,12 +296,19 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({
       project?.provider === "openai"
         ? "gpt-5.5"
         : project?.provider === "anthropic"
-        ? "claude-3-7-sonnet"
-        : "gemini-2.5-flash";
+          ? "claude-3-7-sonnet"
+          : "gemini-2.5-flash";
 
-    const promptTokens = statusCode === 200 ? Math.floor(Math.random() * 200) + 20 : 0;
-    const completionTokens = statusCode === 200 ? Math.floor(Math.random() * 80) + 10 : 0;
-    const cost = statusCode === 200 ? Number((promptTokens * 0.000003 + completionTokens * 0.000015).toFixed(6)) : 0;
+    const promptTokens =
+      statusCode === 200 ? Math.floor(Math.random() * 200) + 20 : 0;
+    const completionTokens =
+      statusCode === 200 ? Math.floor(Math.random() * 80) + 10 : 0;
+    const cost =
+      statusCode === 200
+        ? Number(
+            (promptTokens * 0.000003 + completionTokens * 0.000015).toFixed(6),
+          )
+        : 0;
 
     const newLog: UsageLog = {
       id: `log-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
@@ -283,8 +329,10 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({
     if (cost > 0) {
       setProjects((prev) =>
         prev.map((p) =>
-          p.id === projectId ? { ...p, spend: Number((p.spend + cost).toFixed(6)) } : p
-        )
+          p.id === projectId
+            ? { ...p, spend: Number((p.spend + cost).toFixed(6)) }
+            : p,
+        ),
       );
     }
   };

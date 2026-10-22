@@ -1,30 +1,62 @@
 import { useState, useMemo } from "react";
 import { useParams, Link } from "react-router-dom";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   Search,
-  Activity,
   AlertTriangle,
+  Terminal,
+  DollarSign,
+  X,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
 } from "lucide-react";
 import { useProjects } from "../../context/ProjectContext";
 
 export default function ProjectLogsPage() {
   const { projectId } = useParams<{ projectId: string }>();
-  const { projects, logs, addMockLog } = useProjects();
+  const { projects, logs } = useProjects();
 
   const project = projects.find((p) => p.id === projectId);
-  const projectLogs = projectId ? logs[projectId] ?? [] : [];
+  const projectLogs = projectId ? (logs[projectId] ?? []) : [];
 
-  const [filterStatus, setFilterStatus] = useState<"all" | "200" | "429">("all");
+  const [filterStatus, setFilterStatus] = useState<"all" | "200" | "429">(
+    "all",
+  );
   const [searchQuery, setSearchQuery] = useState("");
-  const [simulating, setSimulating] = useState(false);
+  const [selectedLog, setSelectedLog] = useState<any | null>(null);
+
+  // Pagination States
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
 
   if (!project) {
     return (
-      <div className="max-w-4xl mx-auto px-4 py-16 text-center">
-        <h2 className="text-xl font-bold text-white">Project not found</h2>
+      <div
+        style={{
+          maxWidth: "800px",
+          margin: "0 auto",
+          padding: "64px 16px",
+          textAlign: "center",
+          fontFamily: "'JetBrains Mono', monospace",
+          color: "#ffffff",
+        }}
+      >
+        <h2 style={{ fontSize: "18px", fontWeight: 700 }}>Project not found</h2>
         <Link
           to="/dashboard"
-          className="mt-4 inline-block px-4 py-2 rounded-xl bg-white text-black font-semibold text-sm"
+          style={{
+            marginTop: "24px",
+            display: "inline-block",
+            padding: "10px 20px",
+            backgroundColor: "#ffffff",
+            color: "#000000",
+            fontWeight: 700,
+            fontSize: "12px",
+            textDecoration: "none",
+            textTransform: "uppercase",
+          }}
         >
           Return to Dashboard
         </Link>
@@ -32,6 +64,7 @@ export default function ProjectLogsPage() {
     );
   }
 
+  // Filtered dataset
   const filteredLogs = useMemo(() => {
     return projectLogs.filter((log) => {
       const matchesStatus =
@@ -48,196 +81,412 @@ export default function ProjectLogsPage() {
     });
   }, [projectLogs, filterStatus, searchQuery]);
 
-  const handleSimulate = (status: number) => {
-    if (!projectId) return;
-    setSimulating(true);
-    setTimeout(() => {
-      addMockLog(projectId, status);
-      setSimulating(false);
-    }, 300);
-  };
-
+  // Total cost across filtered logs
   const totalCost = filteredLogs.reduce((acc, l) => acc + l.cost_usd, 0);
 
+  // Pagination Calculations
+  const totalPages = Math.max(1, Math.ceil(filteredLogs.length / pageSize));
+  const activePage = Math.min(currentPage, totalPages);
+
+  const paginatedLogs = useMemo(() => {
+    const startIndex = (activePage - 1) * pageSize;
+    return filteredLogs.slice(startIndex, startIndex + pageSize);
+  }, [filteredLogs, activePage, pageSize]);
+
+  const handlePageChange = (newPage: number) => {
+    if (newPage >= 1 && newPage <= totalPages) {
+      setCurrentPage(newPage);
+    }
+  };
+
   return (
-    <div className="max-w-6xl mx-auto px-4 sm:px-6 md:px-8 py-8 space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-6 border-b border-border/80">
-        <div>
-          <div className="flex items-center gap-2 text-xs font-medium text-text-muted mb-1">
-            <Link to="/dashboard" className="hover:text-white transition-colors">
+    <motion.div
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.25, ease: "easeOut" }}
+      style={{
+        width: "100%",
+        maxWidth: "1080px",
+        margin: "0 auto",
+        padding: "12px 16px 80px 16px",
+        display: "flex",
+        flexDirection: "column",
+        gap: "28px",
+        boxSizing: "border-box",
+        userSelect: "none",
+      }}
+    >
+      {/* ── Page Header ────────────────────────────────────────────── */}
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "row",
+          flexWrap: "wrap",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: "16px",
+          paddingBottom: "24px",
+          borderBottom: "1px solid #222222",
+        }}
+      >
+        <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "8px",
+              fontSize: "12px",
+              color: "#8e8e8e",
+            }}
+          >
+            <Link
+              to="/dashboard"
+              style={{ color: "#8e8e8e", textDecoration: "none" }}
+            >
               Projects
             </Link>
             <span>/</span>
             <Link
               to={`/dashboard/project/${project.id}`}
-              className="hover:text-white transition-colors"
+              style={{ color: "#8e8e8e", textDecoration: "none" }}
             >
               {project.name}
             </Link>
             <span>/</span>
-            <span className="text-white">Request Logs</span>
+            <span style={{ color: "#ffffff", fontWeight: 600 }}>
+              Request Logs
+            </span>
           </div>
-          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-white flex items-center gap-3">
-            Request Logs & Telemetry
-          </h1>
-          <p className="mt-1 text-sm text-text-secondary">
-            Live telemetry flushed by Setu background batch workers with zero-copy stream chunking.
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "12px",
+              marginTop: "4px",
+            }}
+          >
+            <h1
+              style={{
+                fontSize: "24px",
+                fontWeight: 700,
+                color: "#ffffff",
+                letterSpacing: "-0.02em",
+                margin: 0,
+              }}
+            >
+              Telemetry & Logs
+            </h1>
+            <div
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "6px",
+                padding: "3px 10px",
+                backgroundColor: "rgba(52, 211, 153, 0.1)",
+                border: "1px solid rgba(52, 211, 153, 0.3)",
+                fontSize: "10px",
+                fontFamily: "'JetBrains Mono', monospace",
+                color: "#34D399",
+                fontWeight: 700,
+              }}
+            >
+              <span
+                style={{
+                  width: "6px",
+                  height: "6px",
+                  backgroundColor: "#34D399",
+                  borderRadius: "50%",
+                }}
+              />
+              LIVE TELEMETRY
+            </div>
+          </div>
+          <p style={{ fontSize: "12px", color: "#8e8e8e", margin: 0 }}>
+            Real-time HTTP proxy logs emitted asynchronously by Setu background
+            Goroutines.
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            disabled={simulating}
-            onClick={() => handleSimulate(200)}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-surface border border-border text-xs font-medium text-white hover:bg-surface-elevated transition-colors cursor-pointer"
-          >
-            <Activity className="size-3.5 text-emerald-400" />
-            <span>Simulate 200</span>
-          </button>
-
-          <button
-            type="button"
-            disabled={simulating}
-            onClick={() => handleSimulate(429)}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-surface border border-border text-xs font-medium text-white hover:bg-surface-elevated transition-colors cursor-pointer"
-          >
-            <AlertTriangle className="size-3.5 text-red-400" />
-            <span>Simulate 429</span>
-          </button>
+        {/* Total Cost Telemetry */}
+        <div
+          style={{
+            padding: "10px 18px",
+            backgroundColor: "#121212",
+            border: "1px solid #222222",
+            display: "flex",
+            alignItems: "center",
+            gap: "12px",
+          }}
+        >
+          <DollarSign size={16} color="#34D399" />
+          <div style={{ display: "flex", flexDirection: "column" }}>
+            <span
+              style={{
+                fontSize: "10px",
+                fontFamily: "'JetBrains Mono', monospace",
+                color: "#71717a",
+                textTransform: "uppercase",
+              }}
+            >
+              FILTERED COST
+            </span>
+            <span
+              style={{
+                fontSize: "14px",
+                fontFamily: "'JetBrains Mono', monospace",
+                fontWeight: 700,
+                color: "#ffffff",
+              }}
+            >
+              ${totalCost.toFixed(6)}
+            </span>
+          </div>
         </div>
       </div>
 
-      {/* Toolbar / Filters */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 rounded-2xl bg-surface border border-border">
-        {/* Search Input */}
-        <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-text-muted" />
+      {/* ── Toolbar & Filters ─────────────────────────────────────── */}
+      <div
+        style={{
+          display: "flex",
+          flexWrap: "wrap",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: "16px",
+          padding: "16px",
+          backgroundColor: "#121212",
+          border: "1px solid #222222",
+          boxSizing: "border-box",
+        }}
+      >
+        {/* Search */}
+        <div style={{ position: "relative", flex: 1, minWidth: "240px" }}>
+          <Search
+            size={14}
+            color="#71717a"
+            style={{
+              position: "absolute",
+              left: "12px",
+              top: "50%",
+              transform: "translateY(-50%)",
+            }}
+          />
           <input
             type="text"
             placeholder="Search by model or log ID..."
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full h-9 pl-9 pr-3 rounded-xl bg-[#141414] border border-border text-xs text-white placeholder-text-muted focus:outline-none focus:border-brand transition-colors"
+            onChange={(e) => {
+              setSearchQuery(e.target.value);
+              setCurrentPage(1);
+            }}
+            style={{
+              width: "100%",
+              height: "38px",
+              paddingLeft: "36px",
+              paddingRight: "12px",
+              backgroundColor: "#171717",
+              border: "1px solid #222222",
+              fontSize: "12px",
+              fontFamily: "'JetBrains Mono', monospace",
+              color: "#ffffff",
+              outline: "none",
+              boxSizing: "border-box",
+            }}
           />
         </div>
 
-        {/* Status Filter Buttons */}
-        <div className="flex items-center gap-1 rounded-xl bg-[#141414] p-1 border border-border/80">
-          <button
-            type="button"
-            onClick={() => setFilterStatus("all")}
-            className={`px-3 py-1 rounded-lg text-xs font-medium cursor-pointer transition-colors ${
-              filterStatus === "all"
-                ? "bg-white text-black font-semibold"
-                : "text-text-muted hover:text-white"
-            }`}
-          >
-            All ({projectLogs.length})
-          </button>
-          <button
-            type="button"
-            onClick={() => setFilterStatus("200")}
-            className={`px-3 py-1 rounded-lg text-xs font-medium cursor-pointer transition-colors ${
-              filterStatus === "200"
-                ? "bg-emerald-500/20 text-emerald-300 font-semibold border border-emerald-500/30"
-                : "text-text-muted hover:text-white"
-            }`}
-          >
-            200 OK
-          </button>
-          <button
-            type="button"
-            onClick={() => setFilterStatus("429")}
-            className={`px-3 py-1 rounded-lg text-xs font-medium cursor-pointer transition-colors ${
-              filterStatus === "429"
-                ? "bg-red-500/20 text-red-300 font-semibold border border-red-500/30"
-                : "text-text-muted hover:text-white"
-            }`}
-          >
-            429 Blocked
-          </button>
-        </div>
-
-        <div className="hidden sm:flex items-center gap-1.5 px-3 py-1 rounded-xl bg-[#141414] border border-border/60 text-xs font-mono text-text-muted">
-          <span>Cost:</span>
-          <span className="text-white font-semibold">${totalCost.toFixed(6)}</span>
+        {/* Filter Badges */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "4px",
+            backgroundColor: "#171717",
+            border: "1px solid #222222",
+            padding: "3px",
+          }}
+        >
+          {(["all", "200", "429"] as const).map((status) => (
+            <button
+              key={status}
+              type="button"
+              onClick={() => {
+                setFilterStatus(status);
+                setCurrentPage(1);
+              }}
+              style={{
+                padding: "6px 14px",
+                fontSize: "11px",
+                fontFamily: "'JetBrains Mono', monospace",
+                fontWeight: 600,
+                cursor: "pointer",
+                backgroundColor:
+                  filterStatus === status ? "#222222" : "transparent",
+                color:
+                  filterStatus === status
+                    ? status === "200"
+                      ? "#34D399"
+                      : status === "429"
+                        ? "#f87171"
+                        : "#ffffff"
+                    : "#71717a",
+                border: "none",
+                textTransform: "uppercase",
+              }}
+            >
+              {status === "all"
+                ? `ALL (${projectLogs.length})`
+                : status === "200"
+                  ? "200 OK"
+                  : "429 BLOCKED"}
+            </button>
+          ))}
         </div>
       </div>
 
-      {/* Logs Table */}
-      <div className="p-6 rounded-2xl bg-surface border border-border">
+      {/* ── Logs Table ────────────────────────────────────────────── */}
+      <div
+        style={{
+          backgroundColor: "#121212",
+          border: "1px solid #222222",
+          padding: "24px",
+          display: "flex",
+          flexDirection: "column",
+          gap: "16px",
+          boxSizing: "border-box",
+        }}
+      >
         {filteredLogs.length === 0 ? (
-          <div className="py-16 text-center text-sm text-text-muted">
-            No logs matching current filter criteria.
+          <div
+            style={{
+              padding: "48px 0",
+              textAlign: "center",
+              fontSize: "12px",
+              fontFamily: "'JetBrains Mono', monospace",
+              color: "#71717a",
+            }}
+          >
+            No telemetry records found matching the current criteria.
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs font-mono">
+          <div style={{ overflowX: "auto" }}>
+            <table
+              style={{
+                width: "100%",
+                borderCollapse: "collapse",
+                textAlign: "left",
+                fontSize: "12px",
+                fontFamily: "'JetBrains Mono', monospace",
+              }}
+            >
               <thead>
-                <tr className="border-b border-border/40 text-text-muted font-sans font-medium text-[11px] uppercase tracking-wider">
-                  <th className="pb-3 pl-2">Status</th>
-                  <th className="pb-3">Model</th>
-                  <th className="pb-3">Tokens (Prompt / Comp)</th>
-                  <th className="pb-3">Cost (USD)</th>
-                  <th className="pb-3 pr-2 text-right">Time</th>
+                <tr
+                  style={{
+                    borderBottom: "1px solid #1f1f1f",
+                    color: "#71717a",
+                    fontSize: "10px",
+                    textTransform: "uppercase",
+                  }}
+                >
+                  <th style={{ paddingBottom: "12px", paddingLeft: "8px" }}>
+                    STATUS
+                  </th>
+                  <th style={{ paddingBottom: "12px" }}>MODEL</th>
+                  <th style={{ paddingBottom: "12px" }}>
+                    TOKENS (PROMPT / COMPL)
+                  </th>
+                  <th style={{ paddingBottom: "12px" }}>UPSTREAM COST</th>
+                  <th
+                    style={{
+                      paddingBottom: "12px",
+                      paddingRight: "8px",
+                      textAlign: "right",
+                    }}
+                  >
+                    TIMESTAMP
+                  </th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-border/25">
-                {filteredLogs.map((log) => {
+              <tbody>
+                {paginatedLogs.map((log) => {
                   const isBlocked = log.status_code === 429;
                   return (
                     <tr
                       key={log.id}
-                      className="hover:bg-white/[0.02] transition-colors"
+                      onClick={() => setSelectedLog(log)}
+                      style={{
+                        borderBottom: "1px solid #1a1a1a",
+                        cursor: "pointer",
+                        transition: "background-color 0.15s ease",
+                      }}
+                      onMouseEnter={(e) =>
+                        (e.currentTarget.style.backgroundColor = "#171717")
+                      }
+                      onMouseLeave={(e) =>
+                        (e.currentTarget.style.backgroundColor = "transparent")
+                      }
                     >
-                      <td className="py-3 pl-2">
+                      <td style={{ padding: "12px 8px" }}>
                         <span
-                          className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[11px] font-semibold ${
-                            isBlocked
-                              ? "bg-red-500/10 text-red-400 border border-red-500/20"
-                              : "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
-                          }`}
+                          style={{
+                            padding: "2px 8px",
+                            fontWeight: 700,
+                            backgroundColor: isBlocked
+                              ? "rgba(248, 113, 113, 0.1)"
+                              : "rgba(52, 211, 153, 0.1)",
+                            color: isBlocked ? "#f87171" : "#34D399",
+                            border: isBlocked
+                              ? "1px solid rgba(248, 113, 113, 0.3)"
+                              : "1px solid rgba(52, 211, 153, 0.3)",
+                          }}
                         >
-                          <span
-                            className={`size-1.5 rounded-full ${
-                              isBlocked ? "bg-red-400" : "bg-emerald-400"
-                            }`}
-                          />
-                          {log.status_code} {isBlocked ? "Quota Limit" : "OK"}
+                          {log.status_code} {isBlocked ? "BLOCKED" : "OK"}
                         </span>
                       </td>
-
-                      <td className="py-3 text-white font-medium">
+                      <td
+                        style={{
+                          padding: "12px",
+                          color: "#ffffff",
+                          fontWeight: 600,
+                        }}
+                      >
                         {log.model}
                       </td>
-
-                      <td className="py-3 text-text-secondary">
+                      <td style={{ padding: "12px", color: "#8e8e8e" }}>
                         {isBlocked ? (
-                          <span className="text-text-muted font-sans italic text-[11px]">
-                            Request intercepted before upstream
+                          <span style={{ color: "#71717a" }}>
+                            Intercepted by Redis quota
                           </span>
                         ) : (
                           <span>
-                            <span className="text-white">{log.prompt_tokens}</span> in /{" "}
-                            <span className="text-white">{log.completion_tokens}</span> out{" "}
-                            <span className="text-text-muted">
-                              ({log.prompt_tokens + log.completion_tokens} total)
-                            </span>
+                            <strong style={{ color: "#ffffff" }}>
+                              {log.prompt_tokens}
+                            </strong>{" "}
+                            in /{" "}
+                            <strong style={{ color: "#ffffff" }}>
+                              {log.completion_tokens}
+                            </strong>{" "}
+                            out
                           </span>
                         )}
                       </td>
-
-                      <td className="py-3 text-white">
-                        {isBlocked ? (
-                          <span className="text-emerald-400">$0.000000 (Saved)</span>
-                        ) : (
-                          `$${log.cost_usd.toFixed(6)}`
-                        )}
+                      <td
+                        style={{
+                          padding: "12px",
+                          color: isBlocked ? "#34D399" : "#ffffff",
+                          fontWeight: 600,
+                        }}
+                      >
+                        {isBlocked
+                          ? "$0.000000"
+                          : `$${log.cost_usd.toFixed(6)}`}
                       </td>
-
-                      <td className="py-3 pr-2 text-right text-text-muted font-sans">
+                      <td
+                        style={{
+                          padding: "12px 8px",
+                          textAlign: "right",
+                          color: "#71717a",
+                        }}
+                      >
                         {log.created_at}
                       </td>
                     </tr>
@@ -247,7 +496,304 @@ export default function ProjectLogsPage() {
             </table>
           </div>
         )}
+
+        {/* ── Pagination Controls Bar ────────────────────────────── */}
+        {filteredLogs.length > 0 && (
+          <div
+            style={{
+              display: "flex",
+              flexWrap: "wrap",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: "16px",
+              paddingTop: "20px",
+              marginTop: "8px",
+              borderTop: "1px solid #1f1f1f",
+              fontFamily: "'JetBrains Mono', monospace",
+              fontSize: "11px",
+              color: "#71717a",
+            }}
+          >
+            {/* Page Size Selector */}
+            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+              <span>ROWS PER PAGE:</span>
+              <select
+                value={pageSize}
+                onChange={(e) => {
+                  setPageSize(Number(e.target.value));
+                  setCurrentPage(1);
+                }}
+                style={{
+                  backgroundColor: "#171717",
+                  border: "1px solid #222222",
+                  color: "#ffffff",
+                  padding: "4px 8px",
+                  fontSize: "11px",
+                  fontFamily: "'JetBrains Mono', monospace",
+                  outline: "none",
+                  cursor: "pointer",
+                }}
+              >
+                <option value={10}>10</option>
+                <option value={25}>25</option>
+                <option value={50}>50</option>
+              </select>
+            </div>
+
+            {/* Page Indicator */}
+            <div>
+              SHOWING{" "}
+              <strong style={{ color: "#ffffff" }}>
+                {(activePage - 1) * pageSize + 1}
+              </strong>{" "}
+              -{" "}
+              <strong style={{ color: "#ffffff" }}>
+                {Math.min(activePage * pageSize, filteredLogs.length)}
+              </strong>{" "}
+              OF{" "}
+              <strong style={{ color: "#ffffff" }}>
+                {filteredLogs.length}
+              </strong>{" "}
+              LOGS
+            </div>
+
+            {/* Navigation Buttons */}
+            <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+              <button
+                type="button"
+                disabled={activePage === 1}
+                onClick={() => handlePageChange(1)}
+                style={{
+                  padding: "6px",
+                  backgroundColor: "#171717",
+                  border: "1px solid #222222",
+                  color: activePage === 1 ? "#3f3f46" : "#ffffff",
+                  cursor: activePage === 1 ? "not-allowed" : "pointer",
+                }}
+              >
+                <ChevronsLeft size={14} />
+              </button>
+              <button
+                type="button"
+                disabled={activePage === 1}
+                onClick={() => handlePageChange(activePage - 1)}
+                style={{
+                  padding: "6px",
+                  backgroundColor: "#171717",
+                  border: "1px solid #222222",
+                  color: activePage === 1 ? "#3f3f46" : "#ffffff",
+                  cursor: activePage === 1 ? "not-allowed" : "pointer",
+                }}
+              >
+                <ChevronLeft size={14} />
+              </button>
+
+              <span
+                style={{ padding: "0 8px", color: "#ffffff", fontWeight: 700 }}
+              >
+                {activePage} / {totalPages}
+              </span>
+
+              <button
+                type="button"
+                disabled={activePage === totalPages}
+                onClick={() => handlePageChange(activePage + 1)}
+                style={{
+                  padding: "6px",
+                  backgroundColor: "#171717",
+                  border: "1px solid #222222",
+                  color: activePage === totalPages ? "#3f3f46" : "#ffffff",
+                  cursor: activePage === totalPages ? "not-allowed" : "pointer",
+                }}
+              >
+                <ChevronRight size={14} />
+              </button>
+              <button
+                type="button"
+                disabled={activePage === totalPages}
+                onClick={() => handlePageChange(totalPages)}
+                style={{
+                  padding: "6px",
+                  backgroundColor: "#171717",
+                  border: "1px solid #222222",
+                  color: activePage === totalPages ? "#3f3f46" : "#ffffff",
+                  cursor: activePage === totalPages ? "not-allowed" : "pointer",
+                }}
+              >
+                <ChevronsRight size={14} />
+              </button>
+            </div>
+          </div>
+        )}
       </div>
-    </div>
+
+      {/* ── Log Detail Inspector Drawer ───────────────────────────── */}
+      <AnimatePresence>
+        {selectedLog && (
+          <div
+            style={{
+              position: "fixed",
+              inset: 0,
+              zIndex: 9999,
+              display: "flex",
+              justifyContent: "flex-end",
+              backgroundColor: "rgba(0, 0, 0, 0.75)",
+              backdropFilter: "blur(4px)",
+            }}
+          >
+            <motion.div
+              initial={{ x: "100%" }}
+              animate={{ x: 0 }}
+              exit={{ x: "100%" }}
+              transition={{ type: "spring", damping: 25, stiffness: 200 }}
+              style={{
+                width: "100%",
+                maxWidth: "480px",
+                height: "100%",
+                backgroundColor: "#121212",
+                borderLeft: "1px solid #222222",
+                padding: "28px",
+                display: "flex",
+                flexDirection: "column",
+                gap: "24px",
+                boxSizing: "border-box",
+                overflowY: "auto",
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  paddingBottom: "16px",
+                  borderBottom: "1px solid #1f1f1f",
+                }}
+              >
+                <div
+                  style={{ display: "flex", alignItems: "center", gap: "10px" }}
+                >
+                  <Terminal size={16} color="#C084FC" />
+                  <h3
+                    style={{
+                      fontSize: "12px",
+                      fontFamily: "'JetBrains Mono', monospace",
+                      fontWeight: 700,
+                      color: "#ffffff",
+                      margin: 0,
+                      textTransform: "uppercase",
+                    }}
+                  >
+                    LOG TELEMETRY DETAIL
+                  </h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setSelectedLog(null)}
+                  style={{
+                    backgroundColor: "transparent",
+                    border: "none",
+                    color: "#71717a",
+                    cursor: "pointer",
+                  }}
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              {/* Drawer Fields */}
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "16px",
+                  fontFamily: "'JetBrains Mono', monospace",
+                  fontSize: "12px",
+                }}
+              >
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    padding: "12px",
+                    backgroundColor: "#171717",
+                    border: "1px solid #222222",
+                  }}
+                >
+                  <span style={{ color: "#71717a" }}>LOG ID</span>
+                  <span style={{ color: "#ffffff", fontWeight: 600 }}>
+                    {selectedLog.id}
+                  </span>
+                </div>
+
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    padding: "12px",
+                    backgroundColor: "#171717",
+                    border: "1px solid #222222",
+                  }}
+                >
+                  <span style={{ color: "#71717a" }}>HTTP STATUS</span>
+                  <span
+                    style={{
+                      color:
+                        selectedLog.status_code === 200 ? "#34D399" : "#f87171",
+                      fontWeight: 700,
+                    }}
+                  >
+                    {selectedLog.status_code}
+                  </span>
+                </div>
+
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    padding: "12px",
+                    backgroundColor: "#171717",
+                    border: "1px solid #222222",
+                  }}
+                >
+                  <span style={{ color: "#71717a" }}>TARGET MODEL</span>
+                  <span style={{ color: "#ffffff", fontWeight: 600 }}>
+                    {selectedLog.model}
+                  </span>
+                </div>
+
+                <div
+                  style={{
+                    padding: "16px",
+                    backgroundColor: "#171717",
+                    border: "1px solid #222222",
+                    color: "#8e8e8e",
+                  }}
+                >
+                  <p
+                    style={{
+                      margin: "0 0 8px 0",
+                      color: "#71717a",
+                      fontWeight: 700,
+                    }}
+                  >
+                    POSTGRES PAYLOAD DUMP
+                  </p>
+                  <pre
+                    style={{
+                      margin: 0,
+                      color: "#34D399",
+                      fontSize: "11px",
+                      overflowX: "auto",
+                    }}
+                  >
+                    {JSON.stringify(selectedLog, null, 2)}
+                  </pre>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+    </motion.div>
   );
 }
