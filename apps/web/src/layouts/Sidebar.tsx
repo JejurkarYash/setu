@@ -13,6 +13,7 @@ import {
   LogOut,
   type LucideIcon,
 } from "lucide-react";
+import { useUser } from "../context/UserContext";
 
 export type NavItem = {
   label: string;
@@ -237,6 +238,7 @@ export default function Sidebar({
   onToggle: () => void;
 }) {
   const [brandHovered, setBrandHovered] = useState(false);
+  const { user } = useUser();
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -365,17 +367,25 @@ export default function Sidebar({
           >
             {/* Avatar Box */}
             <div className="flex size-9 shrink-0 items-center justify-center bg-zinc-800 text-xs font-semibold text-white border border-zinc-700 shadow-sm">
-              U
+              {user?.avatarUrl ? (
+                <img
+                  src={user.avatarUrl}
+                  alt={`${user.name}'s avatar`}
+                  className="size-full object-cover"
+                />
+              ) : (
+                (user?.name.charAt(0).toUpperCase() ?? "U")
+              )}
             </div>
 
             {!collapsed && (
               <div className="flex flex-1 items-center justify-between min-w-0">
                 <div className="truncate pr-3">
                   <p className="text-xs font-semibold text-white truncate leading-tight">
-                    User Account
+                    {user?.name ?? "Loading profile..."}
                   </p>
                   <p className="text-[10px] text-zinc-400 truncate leading-tight mt-1">
-                    user@setu.dev
+                    {user?.email ?? ""}
                   </p>
                 </div>
                 <button

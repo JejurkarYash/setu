@@ -1,17 +1,55 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { User, Mail, Shield, Key, Check, Save } from "lucide-react";
+import {
+  User,
+  Mail,
+  Shield,
+  Key,
+  Check,
+  Save,
+  Lock,
+  Edit2,
+  X,
+  Image as ImageIcon,
+  Loader2,
+} from "lucide-react";
+import { useUser } from "../context/UserContext";
 
 export default function GlobalSettingsPage() {
+  const { user, isLoadingUser, userError } = useUser();
   const [name, setName] = useState("Yash Jejurkar");
   const [email, setEmail] = useState("yash@setu.dev");
+  const [avatarUrl, setAvatarUrl] = useState("");
   const [role, setRole] = useState("Workspace Owner");
+
+  // Edit mode & loading states
+  const [isEditingProfile, setIsEditingProfile] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [savedSuccess, setSavedSuccess] = useState(false);
+
+  useEffect(() => {
+    if (!user) return;
+    setName(user.name);
+    setEmail(user.email);
+    setAvatarUrl(user.avatarUrl);
+  }, [user]);
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
-    setSavedSuccess(true);
-    setTimeout(() => setSavedSuccess(false), 2500);
+    setIsSubmitting(true);
+
+    // Simulate async network request for saving profile
+    setTimeout(() => {
+      setIsSubmitting(false);
+      setIsEditingProfile(false);
+      setSavedSuccess(true);
+      setTimeout(() => setSavedSuccess(false), 2500);
+    }, 1200);
+  };
+
+  // Helper to extract the first character for the fallback avatar
+  const getInitials = (str: string) => {
+    return str ? str.charAt(0).toUpperCase() : "U";
   };
 
   return (
@@ -54,8 +92,19 @@ export default function GlobalSettingsPage() {
             Global Settings
           </h1>
           <p style={{ fontSize: "13px", color: "#8e8e8e", margin: 0 }}>
-            Manage your personal profile credentials and workspace access level.
+            Manage your personal profile credentials, avatar, and workspace
+            access level.
           </p>
+          {isLoadingUser && (
+            <p style={{ fontSize: "12px", color: "#a1a1aa", margin: 0 }}>
+              Loading profile...
+            </p>
+          )}
+          {userError && (
+            <p style={{ fontSize: "12px", color: "#f87171", margin: 0 }}>
+              {userError}
+            </p>
+          )}
         </div>
 
         <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
@@ -84,34 +133,43 @@ export default function GlobalSettingsPage() {
             )}
           </AnimatePresence>
 
-          <button
-            type="button"
-            onClick={handleSave}
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: "8px",
-              backgroundColor: "#141414",
-              border: "1px solid #262626",
-              color: "#ffffff",
-              fontWeight: 600,
-              fontSize: "13px",
-              padding: "10px 20px",
-              cursor: "pointer",
-              transition: "all 0.2s ease",
-              boxShadow: "0 2px 8px rgba(0,0,0,0.4)",
-            }}
-            onMouseEnter={(e) =>
-              (e.currentTarget.style.borderColor = "rgba(168, 85, 247, 0.6)")
-            }
-            onMouseLeave={(e) =>
-              (e.currentTarget.style.borderColor = "#262626")
-            }
-          >
-            <Save size={15} color="#C084FC" />
-            <span>Save Profile</span>
-          </button>
+          {isEditingProfile && (
+            <motion.button
+              type="button"
+              disabled={isSubmitting}
+              onClick={handleSave}
+              whileHover={!isSubmitting ? { scale: 1.02 } : {}}
+              whileTap={!isSubmitting ? { scale: 0.98 } : {}}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: "8px",
+                backgroundColor: "#141414",
+                border: "1px solid #262626",
+                color: "#ffffff",
+                fontWeight: 600,
+                fontSize: "13px",
+                padding: "10px 20px",
+                cursor: isSubmitting ? "not-allowed" : "pointer",
+                opacity: isSubmitting ? 0.7 : 1,
+                transition: "all 0.2s ease",
+                boxShadow: "0 2px 8px rgba(0,0,0,0.4)",
+              }}
+            >
+              {isSubmitting ? (
+                <>
+                  <Loader2 size={15} color="#34D399" className="animate-spin" />
+                  <span>Saving Profile...</span>
+                </>
+              ) : (
+                <>
+                  <Save size={15} color="#C084FC" />
+                  <span>Save Profile</span>
+                </>
+              )}
+            </motion.button>
+          )}
         </div>
       </div>
 
@@ -119,7 +177,7 @@ export default function GlobalSettingsPage() {
         onSubmit={handleSave}
         style={{ display: "flex", flexDirection: "column", gap: "28px" }}
       >
-        {/* ── Section 1: User Profile Credentials ───────────────────────── */}
+        {/* ── Section 1: User Profile & Avatar Credentials ─────────────── */}
         <div
           style={{
             backgroundColor: "#121212",
@@ -161,10 +219,106 @@ export default function GlobalSettingsPage() {
                   textTransform: "uppercase",
                 }}
               >
-                USER PROFILE
+                USER PROFILE & AVATAR
               </h2>
             </div>
-            <User size={16} color="#71717a" />
+
+            {/* <button
+              type="button"
+              disabled={isSubmitting}
+              onClick={() => {
+                if (isEditingProfile) {
+                  setName("Yash Jejurkar");
+                  setEmail("yash@setu.dev");
+                  setAvatarUrl("");
+                }
+                setIsEditingProfile(!isEditingProfile);
+              }}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "6px",
+                padding: "6px 12px",
+                backgroundColor: isEditingProfile ? "#222222" : "#171717",
+                border: "1px solid #222222",
+                color: isEditingProfile ? "#34D399" : "#ffffff",
+                fontSize: "11px",
+                fontFamily: "'JetBrains Mono', monospace",
+                fontWeight: 600,
+                cursor: isSubmitting ? "not-allowed" : "pointer",
+                textTransform: "uppercase",
+              }}
+            >
+              {isEditingProfile ? (
+                <>
+                  <X size={13} color="#f87171" />
+                  <span>CANCEL</span>
+                </>
+              ) : (
+                <>
+                  <Edit2 size={13} color="#C084FC" />
+                  <span>EDIT PROFILE</span>
+                </>
+              )}
+            </button> */}
+          </div>
+
+          {/* Avatar Preview Row */}
+          <div style={{ display: "flex", alignItems: "center", gap: "20px" }}>
+            <div
+              style={{
+                width: "64px",
+                height: "64px",
+                borderRadius: "50%",
+                backgroundColor: "#1c1c1c",
+                border: "1px solid #2a2a2a",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                overflow: "hidden",
+                flexShrink: "0",
+              }}
+            >
+              {avatarUrl.trim() !== "" ? (
+                <img
+                  src={avatarUrl}
+                  alt="Avatar"
+                  style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                  onError={() => setAvatarUrl("")}
+                />
+              ) : (
+                <span
+                  style={{
+                    fontSize: "22px",
+                    fontWeight: 700,
+                    color: "#C084FC",
+                    fontFamily: "'JetBrains Mono', monospace",
+                  }}
+                >
+                  {getInitials(name)}
+                </span>
+              )}
+            </div>
+
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: "4px",
+                flex: 1,
+              }}
+            >
+              <span
+                style={{ fontSize: "12px", fontWeight: 600, color: "#ffffff" }}
+              >
+                Profile Avatar
+              </span>
+              <span style={{ fontSize: "11px", color: "#8e8e8e" }}>
+                {isEditingProfile
+                  ? "Provide an image URL or leave blank to keep the initial fallback badge."
+                  : "Displays your profile picture or automatically renders an initial letter fallback badge."}
+              </span>
+            </div>
           </div>
 
           <div
@@ -196,6 +350,8 @@ export default function GlobalSettingsPage() {
               <input
                 type="text"
                 required
+                readOnly={!isEditingProfile}
+                disabled={isSubmitting}
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="Your Full Name"
@@ -203,19 +359,18 @@ export default function GlobalSettingsPage() {
                   width: "100%",
                   height: "44px",
                   padding: "0 16px",
-                  backgroundColor: "#171717",
-                  border: "1px solid #222222",
-                  color: "#ffffff",
+                  backgroundColor: isEditingProfile ? "#171717" : "#0f0f0f",
+                  border: isEditingProfile
+                    ? "1px solid #34D399"
+                    : "1px solid #1f1f1f",
+                  color: isEditingProfile ? "#ffffff" : "#8e8e8e",
                   fontFamily: "'JetBrains Mono', monospace",
                   fontSize: "12px",
                   outline: "none",
+                  cursor: isEditingProfile ? "text" : "not-allowed",
                   boxSizing: "border-box",
+                  transition: "all 0.15s ease",
                 }}
-                onFocus={(e) =>
-                  (e.currentTarget.style.borderColor =
-                    "rgba(168, 85, 247, 0.8)")
-                }
-                onBlur={(e) => (e.currentTarget.style.borderColor = "#222222")}
               />
             </div>
 
@@ -241,6 +396,8 @@ export default function GlobalSettingsPage() {
               <input
                 type="email"
                 required
+                readOnly={!isEditingProfile}
+                disabled={isSubmitting}
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="user@setu.dev"
@@ -248,21 +405,73 @@ export default function GlobalSettingsPage() {
                   width: "100%",
                   height: "44px",
                   padding: "0 16px",
-                  backgroundColor: "#171717",
-                  border: "1px solid #222222",
-                  color: "#ffffff",
+                  backgroundColor: isEditingProfile ? "#171717" : "#0f0f0f",
+                  border: isEditingProfile
+                    ? "1px solid #34D399"
+                    : "1px solid #1f1f1f",
+                  color: isEditingProfile ? "#ffffff" : "#8e8e8e",
                   fontFamily: "'JetBrains Mono', monospace",
                   fontSize: "12px",
                   outline: "none",
+                  cursor: isEditingProfile ? "text" : "not-allowed",
                   boxSizing: "border-box",
+                  transition: "all 0.15s ease",
                 }}
-                onFocus={(e) =>
-                  (e.currentTarget.style.borderColor =
-                    "rgba(168, 85, 247, 0.8)")
-                }
-                onBlur={(e) => (e.currentTarget.style.borderColor = "#222222")}
               />
             </div>
+
+            {/* Avatar URL (Only editable when unlocked) */}
+            <AnimatePresence>
+              {isEditingProfile && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: "auto" }}
+                  exit={{ opacity: 0, height: 0 }}
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "10px",
+                    gridColumn: "1 / -1",
+                    overflow: "hidden",
+                  }}
+                >
+                  <label
+                    style={{
+                      fontSize: "11px",
+                      fontFamily: "'JetBrains Mono', monospace",
+                      fontWeight: 700,
+                      color: "#71717a",
+                      textTransform: "uppercase",
+                      letterSpacing: "0.05em",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "6px",
+                    }}
+                  >
+                    <ImageIcon size={13} color="#8e8e8e" /> AVATAR URL
+                  </label>
+                  <input
+                    type="url"
+                    disabled={isSubmitting}
+                    value={avatarUrl}
+                    onChange={(e) => setAvatarUrl(e.target.value)}
+                    placeholder="https://example.com/avatar.jpg"
+                    style={{
+                      width: "100%",
+                      height: "44px",
+                      padding: "0 16px",
+                      backgroundColor: "#171717",
+                      border: "1px solid #34D399",
+                      color: "#ffffff",
+                      fontFamily: "'JetBrains Mono', monospace",
+                      fontSize: "12px",
+                      outline: "none",
+                      boxSizing: "border-box",
+                    }}
+                  />
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
         </div>
 
@@ -348,8 +557,8 @@ export default function GlobalSettingsPage() {
                   width: "100%",
                   height: "44px",
                   padding: "0 16px",
-                  backgroundColor: "#171717",
-                  border: "1px solid #222222",
+                  backgroundColor: "#0f0f0f",
+                  border: "1px solid #1f1f1f",
                   color: "#8e8e8e",
                   fontFamily: "'JetBrains Mono', monospace",
                   fontSize: "12px",
@@ -380,14 +589,14 @@ export default function GlobalSettingsPage() {
                 style={{
                   height: "44px",
                   padding: "0 16px",
-                  backgroundColor: "#171717",
-                  border: "1px solid #222222",
+                  backgroundColor: "#0f0f0f",
+                  border: "1px solid #1f1f1f",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "space-between",
                   fontSize: "12px",
                   fontFamily: "'JetBrains Mono', monospace",
-                  color: "#ffffff",
+                  color: "#8e8e8e",
                   boxSizing: "border-box",
                 }}
               >

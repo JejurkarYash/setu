@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { ProjectProvider } from "./context/ProjectContext";
+import { UserProvider } from "./context/UserContext";
 import AppLayout from "./layouts/AppLayout";
 import DashboardPage from "./pages/DashboardPage";
 import GlobalSettingsPage from "./pages/GlobalSettingsPage";
@@ -12,8 +13,9 @@ import ProjectSettingsPage from "./pages/project/ProjectSettingsPage";
 export default function App() {
   return (
     <BrowserRouter>
-      <ProjectProvider>
-        <Routes>
+      <UserProvider>
+        <ProjectProvider>
+          <Routes>
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
 
           <Route element={<AppLayout />}>
@@ -50,8 +52,9 @@ export default function App() {
 
           {/* Catch-all redirect to dashboard */}
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
-        </Routes>
-      </ProjectProvider>
+          </Routes>
+        </ProjectProvider>
+      </UserProvider>
     </BrowserRouter>
   );
 }
