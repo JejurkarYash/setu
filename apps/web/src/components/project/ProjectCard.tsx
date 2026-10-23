@@ -1,28 +1,17 @@
 import React from "react";
 import { ArrowUpRight, MoreHorizontal, AlertTriangle } from "lucide-react";
 
-export type Provider = "openai" | "anthropic" | "gemini";
-
 export interface ProjectCardProps {
   id?: string;
   name?: string;
-  provider?: Provider;
   spend?: number;
   monthlyBudget?: number;
-  requestCount?: number;
-  keyPrefix?: string;
   onClick?: () => void;
   onMenuClick?: (e: React.MouseEvent) => void;
   className?: string;
 }
 
 // ── Helpers ──────────────────────────────────────────────
-
-const PROVIDER_NAMES: Record<Provider, string> = {
-  openai: "OpenAI",
-  anthropic: "Anthropic",
-  gemini: "Gemini",
-};
 
 function formatCurrency(val?: number): string {
   if (val === undefined || val === null) return "—";
@@ -37,11 +26,8 @@ function formatCurrency(val?: number): string {
 export const ProjectCard: React.FC<ProjectCardProps> = ({
   id = "prj_7x9k2m1q",
   name = "Production AI Gateway",
-  provider = "openai",
   spend = 500.1,
   monthlyBudget = 1250.0,
-  requestCount = 142850,
-  keyPrefix = "sk-proj-9a8f",
   onClick,
   onMenuClick,
   className = "",
@@ -97,13 +83,6 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({
       <div className="flex flex-col gap-4" style={{ marginBottom: "16px" }}>
         {/* Row 1: Badge + Actions */}
         <div className="flex items-center justify-between gap-2">
-          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md border border-zinc-800 bg-zinc-900/90">
-            <span className="size-1.5 rounded-full bg-emerald-400" />
-            <span className="text-[10px] font-mono uppercase tracking-wider font-semibold text-zinc-300">
-              {PROVIDER_NAMES[provider] ?? provider}
-            </span>
-          </div>
-
           <div className="flex items-center gap-1 text-zinc-400">
             <button
               type="button"
@@ -132,10 +111,10 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({
             {name}
           </h3>
           <p
-            title={`ID: ${id} | Key Prefix: ${keyPrefix}`}
+            title={`ID: ${id}`}
             className="mt-1 text-xs font-mono text-zinc-500 tracking-tight truncate"
           >
-            {id}
+            Prefix: {id.slice(0, 8)}
           </p>
         </div>
       </div>
@@ -189,9 +168,6 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({
                 : "No budget cap"}
             </span>
 
-            <span className="text-zinc-500 truncate shrink">
-              {requestCount.toLocaleString()} reqs
-            </span>
           </div>
         </div>
       </div>

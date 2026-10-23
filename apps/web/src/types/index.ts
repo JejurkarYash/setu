@@ -1,11 +1,11 @@
 export interface Project {
   id: string;
   name: string;
+  user_id: string;
   monthly_budget: number;
-  spend: number;
-  provider: Provider;
   created_at: string;
-  key_prefix?: string;
+  updated_at: string;
+  spend: number;
 }
 
 export interface ApiKey {

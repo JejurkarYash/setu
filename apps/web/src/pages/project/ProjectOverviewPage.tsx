@@ -84,14 +84,10 @@ export default function ProjectOverviewPage() {
   const totalTokens = promptTokens + completionTokens;
 
   // 4. Provider Key status
-  const providerKeysStatus = [
-    { name: "OpenAI", configured: project.provider === "openai" },
-    { name: "Anthropic", configured: project.provider === "anthropic" },
-    { name: "Gemini", configured: project.provider === "gemini" },
-  ];
+  const providerKeysStatus: { name: string; configured: boolean }[] = [];
 
   // 5. Proxy Key status
-  const primaryKey = `${project.key_prefix ?? "setu_live"}_demo99482`;
+  const primaryKey = `${project.id.slice(0, 8)}_demo99482`;
   const truncatedKey = `${primaryKey.slice(0, 10)}...${primaryKey.slice(-4)}`;
 
   // Hourly volume distribution mock generator (24-hour cycle)
@@ -183,7 +179,7 @@ export default function ProjectOverviewPage() {
                 padding: "2px 8px",
               }}
             >
-              {project.provider.toUpperCase()}
+              PROJECT
             </span>
           </div>
           <p
@@ -194,7 +190,7 @@ export default function ProjectOverviewPage() {
               margin: 0,
             }}
           >
-            ID: {project.id} · Prefix: {project.key_prefix ?? "setu_live"}
+            ID: {project.id} · Prefix: {project.id.slice(0, 8)}
           </p>
         </div>
 

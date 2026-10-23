@@ -32,6 +32,7 @@ func ValidateJWT(tokenString string) (string, error) {
 	if secret == "" {
 		return "", fmt.Errorf("JWT_SECRET environment variable is missing")
 	}
+	
 	token, err := jwt.Parse(tokenString, func(t *jwt.Token) (interface{}, error) {
 		// Ensure algorithm matches HMAC HS256
 		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {

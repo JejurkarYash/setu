@@ -11,6 +11,7 @@ import (
 	"github.com/JejurkarYash/setu/internal/providers/openai"
 	"github.com/JejurkarYash/setu/internal/users"
 	"github.com/go-chi/chi"
+	"github.com/go-chi/cors"
 )
 
 type RouterConfig struct {
@@ -26,6 +27,22 @@ type RouterConfig struct {
 func NewRouter(cfg *RouterConfig) *chi.Mux {
 
 	r := chi.NewRouter()
+	// registering cors
+	r.Use(cors.Handler(cors.Options{
+		AllowedOrigins: []string{
+			"http://localhost:5173", // Vite frontend
+		},
+		AllowedMethods: []string{
+			"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS",
+		},
+		AllowedHeaders: []string{
+			"Accept",
+			"Authorization",
+			"Content-Type",
+		},
+		AllowCredentials: false,
+		MaxAge:           300,
+	}))
 
 	// health check
 	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {

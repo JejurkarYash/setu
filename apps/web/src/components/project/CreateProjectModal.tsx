@@ -1,6 +1,7 @@
 import { useState } from "react";
+import axios from "axios";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Lock, ShieldAlert, Terminal } from "lucide-react";
+import { X, Lock, ShieldAlert, Loader2, AlertCircle } from "lucide-react";
 import type { Provider } from "../../types";
 
 type CreateProjectModalProps = {
@@ -11,7 +12,7 @@ type CreateProjectModalProps = {
     monthly_budget: number;
     provider: Provider;
     providerKey: string;
-  }) => void;
+  }) => void | Promise<void>;
 };
 
 export default function CreateProjectModal({
@@ -23,22 +24,76 @@ export default function CreateProjectModal({
   const [budget, setBudget] = useState("100.00");
   const [provider, setProvider] = useState<Provider>("openai");
   const [providerKey, setProviderKey] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
+  const [nameError, setNameError] = useState<string | null>(null);
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!name.trim()) return;
-
-    onSubmit({
-      name,
-      monthly_budget: parseFloat(budget) || 100,
-      provider,
-      providerKey,
-    });
-
+  const resetFormState = () => {
     setName("");
     setProviderKey("");
     setBudget("100.00");
     setProvider("openai");
+    setFormError(null);
+    setNameError(null);
+  };
+
+  const handleClose = () => {
+    if (isSubmitting) return;
+    resetFormState();
+    onClose();
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const monthlyBudget = Number(budget);
+
+    setFormError(null);
+    setNameError(null);
+
+    if (!name.trim() || !Number.isFinite(monthlyBudget) || monthlyBudget <= 0) {
+      setFormError("Please enter a valid project name and monthly budget.");
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      await onSubmit({
+        name: name.trim(),
+        monthly_budget: monthlyBudget,
+        provider,
+        providerKey: providerKey.trim(),
+      });
+
+      resetFormState();
+      onClose();
+    } catch (error) {
+      if (axios.isAxiosError(error)) {
+        const serverMessage =
+          typeof error.response?.data?.Error === "string"
+            ? error.response.data.Error
+            : typeof error.response?.data?.error === "string"
+              ? error.response.data.error
+              : null;
+
+        if (error.response?.status === 409) {
+          setNameError(
+            serverMessage ?? "A project with this name already exists.",
+          );
+        } else {
+          setFormError(
+            serverMessage ??
+              "Failed to create gateway project. Please try again.",
+          );
+        }
+      } else {
+        setFormError(
+          "An unexpected error occurred. Please check your network connection.",
+        );
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -71,6 +126,7 @@ export default function CreateProjectModal({
               boxSizing: "border-box",
               color: "#ffffff",
               boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.9)",
+              position: "relative",
               userSelect: "none",
             }}
           >
@@ -114,7 +170,8 @@ export default function CreateProjectModal({
 
               <button
                 type="button"
-                onClick={onClose}
+                onClick={handleClose}
+                disabled={isSubmitting}
                 style={{
                   display: "flex",
                   alignItems: "center",
@@ -124,11 +181,9 @@ export default function CreateProjectModal({
                   backgroundColor: "transparent",
                   border: "none",
                   color: "#71717a",
-                  cursor: "pointer",
+                  cursor: isSubmitting ? "not-allowed" : "pointer",
                   transition: "color 0.2s ease",
                 }}
-                onMouseEnter={(e) => (e.currentTarget.style.color = "#ffffff")}
-                onMouseLeave={(e) => (e.currentTarget.style.color = "#71717a")}
               >
                 <X size={16} />
               </button>
@@ -160,27 +215,47 @@ export default function CreateProjectModal({
                   required
                   placeholder="e.g. Production GPT-4o Gateway"
                   value={name}
-                  onChange={(e) => setName(e.target.value)}
+                  onChange={(e) => {
+                    setName(e.target.value);
+                    if (nameError) setNameError(null);
+                    if (formError) setFormError(null);
+                  }}
+                  disabled={isSubmitting}
                   style={{
                     width: "100%",
                     height: "42px",
                     padding: "0 14px",
                     backgroundColor: "#171717",
-                    border: "1px solid #222222",
+                    border: nameError
+                      ? "1px solid #f87171"
+                      : "1px solid #222222",
                     color: "#ffffff",
                     fontFamily: "'JetBrains Mono', monospace",
                     fontSize: "12px",
                     outline: "none",
                     boxSizing: "border-box",
                   }}
-                  onFocus={(e) =>
-                    (e.currentTarget.style.borderColor =
-                      "rgba(168, 85, 247, 0.8)")
-                  }
-                  onBlur={(e) =>
-                    (e.currentTarget.style.borderColor = "#222222")
-                  }
                 />
+                <AnimatePresence>
+                  {nameError && (
+                    <motion.div
+                      initial={{ opacity: 0, y: -4 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -4 }}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "6px",
+                        color: "#f87171",
+                        fontSize: "11px",
+                        fontFamily: "'JetBrains Mono', monospace",
+                      }}
+                    >
+                      <AlertCircle size={13} color="#f87171" />
+                      <span>{nameError}</span>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </div>
 
               {/* Budget & Provider Grid */}
@@ -216,7 +291,11 @@ export default function CreateProjectModal({
                     min="0"
                     required
                     value={budget}
-                    onChange={(e) => setBudget(e.target.value)}
+                    disabled={isSubmitting}
+                    onChange={(e) => {
+                      setBudget(e.target.value);
+                      if (formError) setFormError(null);
+                    }}
                     style={{
                       width: "100%",
                       height: "42px",
@@ -229,13 +308,6 @@ export default function CreateProjectModal({
                       outline: "none",
                       boxSizing: "border-box",
                     }}
-                    onFocus={(e) =>
-                      (e.currentTarget.style.borderColor =
-                        "rgba(168, 85, 247, 0.8)")
-                    }
-                    onBlur={(e) =>
-                      (e.currentTarget.style.borderColor = "#222222")
-                    }
                   />
                 </div>
 
@@ -260,6 +332,7 @@ export default function CreateProjectModal({
                   </label>
                   <select
                     value={provider}
+                    disabled={isSubmitting}
                     onChange={(e) => setProvider(e.target.value as Provider)}
                     style={{
                       width: "100%",
@@ -271,16 +344,9 @@ export default function CreateProjectModal({
                       fontFamily: "'JetBrains Mono', monospace",
                       fontSize: "12px",
                       outline: "none",
-                      cursor: "pointer",
+                      cursor: isSubmitting ? "not-allowed" : "pointer",
                       boxSizing: "border-box",
                     }}
-                    onFocus={(e) =>
-                      (e.currentTarget.style.borderColor =
-                        "rgba(168, 85, 247, 0.8)")
-                    }
-                    onBlur={(e) =>
-                      (e.currentTarget.style.borderColor = "#222222")
-                    }
                   >
                     <option value="openai">OpenAI</option>
                     <option value="anthropic">Anthropic</option>
@@ -329,6 +395,7 @@ export default function CreateProjectModal({
                   type="password"
                   placeholder="sk-..."
                   value={providerKey}
+                  disabled={isSubmitting}
                   onChange={(e) => setProviderKey(e.target.value)}
                   style={{
                     width: "100%",
@@ -342,15 +409,39 @@ export default function CreateProjectModal({
                     outline: "none",
                     boxSizing: "border-box",
                   }}
-                  onFocus={(e) =>
-                    (e.currentTarget.style.borderColor =
-                      "rgba(168, 85, 247, 0.8)")
-                  }
-                  onBlur={(e) =>
-                    (e.currentTarget.style.borderColor = "#222222")
-                  }
                 />
               </div>
+
+              {/* Professional Error Notification Banner */}
+              <AnimatePresence>
+                {formError && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -6, scale: 0.98 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: -6, scale: 0.98 }}
+                    role="alert"
+                    style={{
+                      display: "flex",
+                      alignItems: "flex-start",
+                      gap: "10px",
+                      padding: "12px 14px",
+                      color: "#f87171",
+                      backgroundColor: "rgba(239, 68, 68, 0.08)",
+                      border: "1px solid rgba(248, 113, 113, 0.3)",
+                      fontSize: "12px",
+                      fontFamily: "'JetBrains Mono', monospace",
+                      boxSizing: "border-box",
+                    }}
+                  >
+                    <AlertCircle
+                      size={16}
+                      color="#f87171"
+                      style={{ flexShrink: 0, marginTop: "1px" }}
+                    />
+                    <span style={{ lineHeight: 1.4 }}>{formError}</span>
+                  </motion.div>
+                )}
+              </AnimatePresence>
 
               {/* Guardrail Note Box */}
               <div
@@ -362,7 +453,6 @@ export default function CreateProjectModal({
                   backgroundColor: "#171717",
                   border: "1px solid #222222",
                   boxSizing: "border-box",
-                  marginTop: "4px",
                 }}
               >
                 <ShieldAlert
@@ -396,7 +486,8 @@ export default function CreateProjectModal({
               >
                 <button
                   type="button"
-                  onClick={onClose}
+                  onClick={handleClose}
+                  disabled={isSubmitting}
                   style={{
                     padding: "10px 18px",
                     fontSize: "12px",
@@ -405,44 +496,46 @@ export default function CreateProjectModal({
                     color: "#8e8e8e",
                     backgroundColor: "transparent",
                     border: "none",
-                    cursor: "pointer",
+                    cursor: isSubmitting ? "not-allowed" : "pointer",
                     transition: "color 0.2s ease",
                   }}
-                  onMouseEnter={(e) =>
-                    (e.currentTarget.style.color = "#ffffff")
-                  }
-                  onMouseLeave={(e) =>
-                    (e.currentTarget.style.color = "#8e8e8e")
-                  }
                 >
                   Cancel
                 </button>
-                <button
+                <motion.button
                   type="submit"
+                  disabled={isSubmitting}
+                  whileHover={!isSubmitting ? { scale: 1.02 } : {}}
+                  whileTap={!isSubmitting ? { scale: 0.98 } : {}}
                   style={{
                     display: "inline-flex",
                     alignItems: "center",
                     justifyContent: "center",
+                    gap: "8px",
                     backgroundColor: "#141414",
                     border: "1px solid #262626",
                     color: "#ffffff",
                     fontWeight: 600,
                     fontSize: "13px",
-                    padding: "10px 20px",
-                    cursor: "pointer",
-                    transition: "all 0.2s ease",
+                    padding: "10px 24px",
+                    cursor: isSubmitting ? "not-allowed" : "pointer",
+                    opacity: isSubmitting ? 0.7 : 1,
                     boxShadow: "0 2px 8px rgba(0,0,0,0.4)",
                   }}
-                  onMouseEnter={(e) =>
-                    (e.currentTarget.style.borderColor =
-                      "rgba(168, 85, 247, 0.6)")
-                  }
-                  onMouseLeave={(e) =>
-                    (e.currentTarget.style.borderColor = "#262626")
-                  }
                 >
-                  Create Project
-                </button>
+                  {isSubmitting ? (
+                    <>
+                      <Loader2
+                        size={15}
+                        color="#34D399"
+                        className="animate-spin"
+                      />
+                      <span>Creating Gateway...</span>
+                    </>
+                  ) : (
+                    <span>Create Project</span>
+                  )}
+                </motion.button>
               </div>
             </form>
           </motion.div>

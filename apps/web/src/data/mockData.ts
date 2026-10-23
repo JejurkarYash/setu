@@ -1,43 +1,4 @@
-import type { Project, ApiKey, UsageLog, AlertSetting } from "../types";
-
-export const initialProjects: Project[] = [
-  {
-    id: "low-budget-test",
-    name: "Low Budget Quota Test Project",
-    monthly_budget: 0.0008,
-    spend: 0.000435,
-    provider: "openai",
-    created_at: "2026-10-12T10:00:00Z",
-    key_prefix: "setu_live_limit",
-  },
-  {
-    id: "openai-production",
-    name: "OpenAI Production Gateway",
-    monthly_budget: 100.0,
-    spend: 14.82,
-    provider: "openai",
-    created_at: "2026-10-10T14:30:00Z",
-    key_prefix: "setu_live_openai",
-  },
-  {
-    id: "claude-eval-pipeline",
-    name: "Anthropic Claude Test Project",
-    monthly_budget: 100.0,
-    spend: 4.25,
-    provider: "anthropic",
-    created_at: "2026-10-11T09:15:00Z",
-    key_prefix: "setu_live_ant",
-  },
-  {
-    id: "gemini-flash-app",
-    name: "Gemini 2.5 Flash High Throughput",
-    monthly_budget: 50.0,
-    spend: 0.38,
-    provider: "gemini",
-    created_at: "2026-10-12T16:45:00Z",
-    key_prefix: "setu_live_gem",
-  },
-];
+import type { ApiKey, UsageLog, AlertSetting } from "../types";
 
 export const sampleApiKeys: Record<string, ApiKey[]> = {
   "low-budget-test": [

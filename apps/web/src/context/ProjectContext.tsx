@@ -1,7 +1,16 @@
-import React, { createContext, useContext, useState, useEffect } from "react";
+import React, {
+  createContext,
+  useCallback,
+  useContext,
+  useState,
+  useEffect,
+} from "react";
 import type { Project, ApiKey, UsageLog, Provider } from "../types";
 import {
-  initialProjects,
+  createProject as createProjectFromApi,
+  fetchProjects as fetchProjectsFromApi,
+} from "../api/projectApi";
+import {
   sampleApiKeys,
   sampleLogs,
   sampleAlerts,
@@ -27,6 +36,9 @@ export interface AlertSetting {
 
 interface ProjectContextType {
   projects: Project[];
+  isLoadingProjects: boolean;
+  projectsError: string | null;
+  fetchProjects: () => Promise<void>;
   apiKeys: Record<string, ApiKey[]>;
   logs: Record<string, UsageLog[]>;
   alerts: Record<string, AlertSetting>;
@@ -34,8 +46,8 @@ interface ProjectContextType {
     name: string;
     monthly_budget: number;
     provider: Provider;
-    providerKey?: string;
-  }) => Project;
+    providerKey: string;
+  }) => Promise<Project>;
   updateProject: (id: string, updates: Partial<Project>) => void;
   resetBudgetUsage: (id: string) => void;
   deleteProject: (id: string) => void;
@@ -57,15 +69,9 @@ const STORAGE_KEYS = {
 export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
-  const [projects, setProjects] = useState<Project[]>(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEYS.PROJECTS);
-      if (saved) return JSON.parse(saved);
-    } catch (e) {
-      console.error("Failed to load projects from storage", e);
-    }
-    return initialProjects;
-  });
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [isLoadingProjects, setIsLoadingProjects] = useState(false);
+  const [projectsError, setProjectsError] = useState<string | null>(null);
 
   const [apiKeys, setApiKeys] = useState<Record<string, ApiKey[]>>(() => {
     try {
@@ -106,6 +112,22 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   }, [projects]);
 
+  const fetchProjects = useCallback(async () => {
+    setIsLoadingProjects(true);
+    setProjectsError(null);
+
+    try {
+      const fetchedProjects = await fetchProjectsFromApi();
+      setProjects(fetchedProjects);
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Failed to fetch projects";
+      setProjectsError(message);
+    } finally {
+      setIsLoadingProjects(false);
+    }
+  }, []);
+
   useEffect(() => {
     try {
       localStorage.setItem(STORAGE_KEYS.KEYS, JSON.stringify(apiKeys));
@@ -130,73 +152,31 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   }, [alerts]);
 
-  const createProject = (data: {
+  const createProject = async (data: {
     name: string;
     monthly_budget: number;
     provider: Provider;
-    providerKey?: string;
-  }): Project => {
-    const id = data.name
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-|-$/g, "");
-    const uniqueId = projects.some((p) => p.id === id)
-      ? `${id}-${Math.floor(Math.random() * 1000)}`
-      : id;
-
-    const prefix = `setu_live_${data.provider.slice(0, 3)}_${Math.random()
-      .toString(36)
-      .substring(2, 6)}`;
-
-    const newProject: Project = {
-      id: uniqueId,
-      name: data.name,
+    providerKey: string;
+  }): Promise<Project> => {
+    const response = await createProjectFromApi({
+      name: data.name.trim(),
       monthly_budget: data.monthly_budget,
-      spend: 0,
       provider: data.provider,
-      created_at: new Date().toISOString(),
-      key_prefix: prefix,
-    };
+      provider_key: data.providerKey.trim(),
+    });
 
-    setProjects((prev) => [newProject, ...prev]);
+    const fetchedProjects = await fetchProjectsFromApi();
+    setProjects(fetchedProjects);
 
-    // Initialize initial API key
-    const newKey: ApiKey = {
-      id: `key-${Date.now()}`,
-      project_id: uniqueId,
-      key_prefix: prefix,
-      is_active: true,
-      created_at: new Date().toISOString(),
-      last_used_at: undefined,
-    };
+    const createdProject = fetchedProjects.find(
+      (project) => project.id === response.id,
+    );
 
-    setApiKeys((prev) => ({
-      ...prev,
-      [uniqueId]: [newKey],
-    }));
+    if (!createdProject) {
+      throw new Error("Created project was not returned by the projects API");
+    }
 
-    // Initialize default alert state (disabled by default)
-    setAlerts((prev) => ({
-      ...prev,
-      [uniqueId]: {
-        id: `alert-${Date.now()}`,
-        project_id: uniqueId,
-        enabled: false,
-        trigger_threshold_pct: 80,
-        channels: [
-          {
-            id: `slack-${Date.now()}`,
-            type: "slack",
-            webhookUrl:
-              "https://hooks.slack.com/services/T000/B000/XXXXXXXXXXXXXXXXXXXX",
-            enabled: true,
-          },
-        ],
-        created_at: new Date().toISOString(),
-      },
-    }));
-
-    return newProject;
+    return createdProject;
   };
 
   const updateProject = (id: string, updates: Partial<Project>) => {
@@ -233,9 +213,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({
   // Generate / Rotate API Key (Enforces single active key rule)
   const generateApiKey = (projectId: string) => {
     const project = projects.find((p) => p.id === projectId);
-    const prefix =
-      project?.key_prefix ??
-      `setu_live_${Math.random().toString(36).substring(2, 7)}`;
+    const prefix = project?.id.slice(0, 8) ?? "project";
     const randomSuffix = Math.random().toString(36).substring(2, 14);
     const rawSecret = `${prefix}_${randomSuffix}`;
 
@@ -291,13 +269,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({
   };
 
   const addMockLog = (projectId: string, statusCode = 200) => {
-    const project = projects.find((p) => p.id === projectId);
-    const model =
-      project?.provider === "openai"
-        ? "gpt-5.5"
-        : project?.provider === "anthropic"
-          ? "claude-3-7-sonnet"
-          : "gemini-2.5-flash";
+    const model = "unknown";
 
     const promptTokens =
       statusCode === 200 ? Math.floor(Math.random() * 200) + 20 : 0;
@@ -341,6 +313,9 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({
     <ProjectContext.Provider
       value={{
         projects,
+        isLoadingProjects,
+        projectsError,
+        fetchProjects,
         apiKeys,
         logs,
         alerts,

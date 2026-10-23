@@ -369,7 +369,7 @@ export default function ProjectSettingsPage() {
               <input
                 type="text"
                 disabled
-                value={project.provider.toUpperCase()}
+                value="Not configured"
                 style={{
                   height: "38px",
                   padding: "0 12px",
@@ -401,7 +401,7 @@ export default function ProjectSettingsPage() {
               <input
                 type="text"
                 disabled
-                value={project.key_prefix ?? "setu_live"}
+                value={project.id.slice(0, 8)}
                 style={{
                   height: "38px",
                   padding: "0 12px",
