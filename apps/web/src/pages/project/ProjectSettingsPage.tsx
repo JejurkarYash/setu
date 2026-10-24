@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -13,12 +13,21 @@ import {
   X,
 } from "lucide-react";
 import { useProjects } from "../../context/ProjectContext";
+import {
+  deleteProject as deleteProjectFromApi,
+  resetProjectBudget,
+  updateProject as updateProjectFromApi,
+} from "../../api/projectApi";
 
 export default function ProjectSettingsPage() {
   const { projectId } = useParams<{ projectId: string }>();
   const navigate = useNavigate();
-  const { projects, updateProject, resetBudgetUsage, deleteProject } =
-    useProjects();
+  const {
+    projects,
+    fetchProjects,
+    isLoadingProjects,
+    projectsError,
+  } = useProjects();
 
   const project = projects.find((p) => p.id === projectId);
 
@@ -37,6 +46,33 @@ export default function ProjectSettingsPage() {
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [isResetModalOpen, setIsResetModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isResetting, setIsResetting] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!project) return;
+    setName(project.name);
+    setBudget(String(project.monthly_budget));
+  }, [project]);
+
+  if (isLoadingProjects) {
+    return (
+      <div
+        style={{
+          maxWidth: "800px",
+          margin: "0 auto",
+          padding: "64px 16px",
+          textAlign: "center",
+          fontFamily: "'JetBrains Mono', monospace",
+          color: "#8e8e8e",
+        }}
+      >
+        Loading project settings...
+      </div>
+    );
+  }
 
   if (!project) {
     return (
@@ -50,7 +86,12 @@ export default function ProjectSettingsPage() {
           color: "#ffffff",
         }}
       >
-        <h2 style={{ fontSize: "18px", fontWeight: 700 }}>Project not found</h2>
+        <h2 style={{ fontSize: "18px", fontWeight: 700 }}>
+          {projectsError ? "Unable to load project" : "Project not found"}
+        </h2>
+        {projectsError && (
+          <p style={{ fontSize: "12px", color: "#f87171" }}>{projectsError}</p>
+        )}
         <Link
           to="/dashboard"
           style={{
@@ -71,31 +112,73 @@ export default function ProjectSettingsPage() {
     );
   }
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!projectId) return;
 
-    updateProject(projectId, {
-      name: name.trim(),
-      monthly_budget: parseFloat(budget) || project.monthly_budget,
-    });
+    const trimmedName = name.trim();
+    const parsedBudget = Number(budget);
+    if (!trimmedName || !Number.isFinite(parsedBudget) || parsedBudget <= 0) {
+      setErrorMsg("Enter a valid project name and monthly budget.");
+      return;
+    }
 
-    setIsEditingName(false);
-    setIsEditingBudget(false);
-    setSavedSuccess(true);
-    setTimeout(() => setSavedSuccess(false), 2500);
+    setIsSaving(true);
+    setErrorMsg(null);
+    try {
+      await updateProjectFromApi(projectId, {
+        name: trimmedName,
+        monthly_budget: parsedBudget,
+      });
+      await fetchProjects();
+      setIsEditingName(false);
+      setIsEditingBudget(false);
+      setSavedSuccess(true);
+      setTimeout(() => setSavedSuccess(false), 2500);
+    } catch (error) {
+      setErrorMsg(
+        error instanceof Error ? error.message : "Failed to save project settings",
+      );
+    } finally {
+      setIsSaving(false);
+    }
   };
 
-  const handleConfirmReset = () => {
+  const handleConfirmReset = async () => {
     if (!projectId) return;
-    resetBudgetUsage(projectId);
-    setIsResetModalOpen(false);
+    setIsResetting(true);
+    setErrorMsg(null);
+    try {
+      await resetProjectBudget(projectId);
+      await fetchProjects();
+      setIsResetModalOpen(false);
+      setSavedSuccess(true);
+      setTimeout(() => setSavedSuccess(false), 2500);
+    } catch (error) {
+      setErrorMsg(
+        error instanceof Error ? error.message : "Failed to reset project spend",
+      );
+    } finally {
+      setIsResetting(false);
+    }
   };
 
-  const handleConfirmDelete = () => {
+  const handleConfirmDelete = async () => {
     if (!projectId || deleteConfirmInput !== project.name) return;
-    deleteProject(projectId);
-    navigate("/dashboard");
+    setIsDeleting(true);
+    setErrorMsg(null);
+    try {
+      await deleteProjectFromApi(projectId);
+      await fetchProjects();
+      setIsDeleteModalOpen(false);
+      navigate("/dashboard");
+    } catch (error) {
+      setErrorMsg(
+        error instanceof Error ? error.message : "Failed to delete project",
+      );
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   return (
@@ -196,6 +279,22 @@ export default function ProjectSettingsPage() {
           )}
         </AnimatePresence>
       </div>
+
+      {errorMsg && (
+        <div
+          role="alert"
+          style={{
+            padding: "12px 16px",
+            backgroundColor: "rgba(248, 113, 113, 0.08)",
+            border: "1px solid rgba(248, 113, 113, 0.3)",
+            color: "#fca5a5",
+            fontSize: "12px",
+            fontFamily: "'JetBrains Mono', monospace",
+          }}
+        >
+          {errorMsg}
+        </div>
+      )}
 
       <form
         onSubmit={handleSave}
@@ -580,7 +679,7 @@ export default function ProjectSettingsPage() {
         <div style={{ display: "flex", justifyContent: "flex-end" }}>
           <motion.button
             type="submit"
-            disabled={!isEditingName && !isEditingBudget}
+            disabled={isSaving || (!isEditingName && !isEditingBudget)}
             whileHover={{ scale: isEditingName || isEditingBudget ? 1.02 : 1 }}
             whileTap={{ scale: isEditingName || isEditingBudget ? 0.98 : 1 }}
             style={{
@@ -605,7 +704,7 @@ export default function ProjectSettingsPage() {
               transition: "all 0.15s ease",
             }}
           >
-            SAVE CHANGES
+            {isSaving ? "SAVING..." : "SAVE CHANGES"}
           </motion.button>
         </div>
       </form>
@@ -756,6 +855,7 @@ export default function ProjectSettingsPage() {
                 <button
                   type="button"
                   onClick={() => setIsResetModalOpen(false)}
+                  disabled={isResetting}
                   style={{
                     padding: "10px 18px",
                     fontSize: "12px",
@@ -772,6 +872,7 @@ export default function ProjectSettingsPage() {
                 <button
                   type="button"
                   onClick={handleConfirmReset}
+                  disabled={isResetting}
                   style={{
                     padding: "10px 20px",
                     fontSize: "12px",
@@ -784,7 +885,7 @@ export default function ProjectSettingsPage() {
                     textTransform: "uppercase",
                   }}
                 >
-                  Confirm Reset
+                  {isResetting ? "Resetting..." : "Confirm Reset"}
                 </button>
               </div>
             </motion.div>
@@ -908,7 +1009,7 @@ export default function ProjectSettingsPage() {
                 </button>
                 <button
                   type="button"
-                  disabled={deleteConfirmInput !== project.name}
+                  disabled={isDeleting || deleteConfirmInput !== project.name}
                   onClick={handleConfirmDelete}
                   style={{
                     padding: "10px 20px",
@@ -932,7 +1033,7 @@ export default function ProjectSettingsPage() {
                     textTransform: "uppercase",
                   }}
                 >
-                  Delete Permanently
+                  {isDeleting ? "Deleting..." : "Delete Permanently"}
                 </button>
               </div>
             </motion.div>

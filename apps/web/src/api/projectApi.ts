@@ -22,8 +22,9 @@ export interface CreateProjectRequest {
   provider_key: string;
 }
 
-interface CreateProjectResponse {
+export interface CreateProjectResponse {
   id: string;
+  api_key: string;
 }
 
 export async function fetchProjects(): Promise<Project[]> {
@@ -45,4 +46,19 @@ export async function createProject(
 ): Promise<CreateProjectResponse> {
   const response = await api.post<CreateProjectResponse>("/projects", data);
   return response.data;
+}
+
+export async function updateProject(
+  projectId: string,
+  data: { name: string; monthly_budget: number },
+): Promise<void> {
+  await api.patch(`/projects/${projectId}`, data);
+}
+
+export async function resetProjectBudget(projectId: string): Promise<void> {
+  await api.post(`/projects/${projectId}/reset-budget`);
+}
+
+export async function deleteProject(projectId: string): Promise<void> {
+  await api.delete(`/projects/${projectId}`);
 }

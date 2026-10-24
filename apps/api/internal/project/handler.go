@@ -4,9 +4,12 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"strconv"
+	"strings"
+	"time"
 
 	"github.com/JejurkarYash/setu/internal/database"
 	"github.com/JejurkarYash/setu/internal/database/dbgen"
@@ -63,6 +66,57 @@ type ListProjectsResponse struct {
 	Projects []dbgen.Project `json:"projects"`
 }
 
+type ProjectOverviewResponse struct {
+	Project        ProjectOverviewProject   `json:"project"`
+	Range          ProjectOverviewRange     `json:"range"`
+	Summary        ProjectOverviewSummary   `json:"summary"`
+	Volume         []ProjectOverviewVolume  `json:"volume"`
+	RecentRequests []ProjectOverviewRequest `json:"recent_requests"`
+}
+
+type ProjectOverviewProject struct {
+	ID                    string  `json:"id"`
+	Name                  string  `json:"name"`
+	MonthlyBudget         float64 `json:"monthly_budget"`
+	Spend                 float64 `json:"spend"`
+	Provider              string  `json:"provider"`
+	ProxyKeyPrefix        string  `json:"proxy_key_prefix"`
+	ProviderKeyConfigured bool    `json:"provider_key_configured"`
+}
+
+type ProjectOverviewRange struct {
+	From     time.Time `json:"from"`
+	To       time.Time `json:"to"`
+	Interval string    `json:"interval"`
+}
+
+type ProjectOverviewSummary struct {
+	TotalRequests      int64   `json:"total_requests"`
+	SuccessfulRequests int64   `json:"successful_requests"`
+	BlockedRequests    int64   `json:"blocked_requests"`
+	PromptTokens       int64   `json:"prompt_tokens"`
+	CompletionTokens   int64   `json:"completion_tokens"`
+	TotalTokens        int64   `json:"total_tokens"`
+	TotalCostUSD       float64 `json:"total_cost_usd"`
+}
+
+type ProjectOverviewVolume struct {
+	Bucket             time.Time `json:"bucket"`
+	TotalRequests      int64     `json:"total_requests"`
+	SuccessfulRequests int64     `json:"successful_requests"`
+	BlockedRequests    int64     `json:"blocked_requests"`
+}
+
+type ProjectOverviewRequest struct {
+	ID               string    `json:"id"`
+	Model            string    `json:"model"`
+	StatusCode       int32     `json:"status_code"`
+	PromptTokens     int32     `json:"prompt_tokens"`
+	CompletionTokens int32     `json:"completion_tokens"`
+	CostUSD          float64   `json:"cost_usd"`
+	CreatedAt        time.Time `json:"created_at"`
+}
+
 type UpdateProjectResponse struct {
 	Project dbgen.Project
 }
@@ -100,6 +154,7 @@ func (h *Handler) Routes() chi.Router {
 
 	// Analytics & Alert Routes
 	r.Get("/{id}/logs", h.GetUsageLogs)
+	r.Get("/{id}/overview", h.GetProjectOverview)
 
 	return r
 
@@ -500,7 +555,7 @@ func (h *Handler) ResetMonthlyBudgetUsage(w http.ResponseWriter, r *http.Request
 	if err != nil {
 		logger.Error("failed to update spend into db", slog.Any("err", err))
 		utils.WriteError(w, http.StatusInternalServerError, "failed to udpate usage database")
-		return 
+		return
 	}
 
 	logger.Info("budget reset succesfully")
@@ -757,4 +812,270 @@ func (h *Handler) GetUsageLogs(w http.ResponseWriter, r *http.Request) {
 		"usage_logs": usageLogs,
 	})
 	return
+}
+
+// analytics
+
+func (h *Handler) GetProjectOverview(w http.ResponseWriter, r *http.Request) {
+	projectID := chi.URLParam(r, "id")
+	if projectID == "" {
+		utils.WriteError(w, http.StatusBadRequest, "project id required")
+		return
+	}
+
+	userID, ok := middleware.GetUserID(r.Context())
+	if !ok {
+		utils.WriteError(w, http.StatusUnauthorized, "invalid token")
+		return
+	}
+
+	logger := h.logger.With(
+		slog.String("user_id", userID),
+		slog.String("project_id", projectID),
+	)
+
+	project, err := h.db.Queries.GetProjectByUserIDAndProjectID(
+		r.Context(),
+		dbgen.GetProjectByUserIDAndProjectIDParams{
+			ID:     projectID,
+			UserID: userID,
+		},
+	)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			utils.WriteError(w, http.StatusNotFound, "project not found")
+			return
+		}
+
+		logger.Error("failed to fetch project overview", slog.Any("err", err))
+		utils.WriteError(w, http.StatusInternalServerError, "failed to fetch project overview")
+		return
+	}
+
+	now := time.Now().UTC()
+	from := now.AddDate(0, 0, -30)
+	to := now
+
+	if value := r.URL.Query().Get("from"); value != "" {
+		parsed, err := time.Parse(time.RFC3339, value)
+		if err != nil {
+			utils.WriteError(w, http.StatusBadRequest, "invalid from timestamp")
+			return
+		}
+		from = parsed.UTC()
+	}
+	if value := r.URL.Query().Get("to"); value != "" {
+		parsed, err := time.Parse(time.RFC3339, value)
+		if err != nil {
+			utils.WriteError(w, http.StatusBadRequest, "invalid to timestamp")
+			return
+		}
+		to = parsed.UTC()
+	}
+	if !from.Before(to) {
+		utils.WriteError(w, http.StatusBadRequest, "from must be before to")
+		return
+	}
+
+	interval := r.URL.Query().Get("interval")
+	if interval == "" {
+		interval = "hour"
+	}
+	if interval != "hour" && interval != "day" {
+		utils.WriteError(w, http.StatusBadRequest, "interval must be hour or day")
+		return
+	}
+
+	filters := []string{
+		"project_id = $1",
+		"created_at >= $2",
+		"created_at <= $3",
+	}
+	filterArgs := []any{projectID, from, to}
+
+	if value := r.URL.Query().Get("status"); value != "" && value != "all" {
+		status, err := strconv.Atoi(value)
+		if err != nil {
+			utils.WriteError(w, http.StatusBadRequest, "invalid status")
+			return
+		}
+		filters = append(filters, fmt.Sprintf("status_code = $%d", len(filterArgs)+1))
+		filterArgs = append(filterArgs, status)
+	}
+	if value := strings.TrimSpace(r.URL.Query().Get("model")); value != "" && value != "all" {
+		filters = append(filters, fmt.Sprintf("model = $%d", len(filterArgs)+1))
+		filterArgs = append(filterArgs, value)
+	}
+
+	whereClause := strings.Join(filters, " AND ")
+	intervalExpression := fmt.Sprintf("date_trunc('%s', created_at)", interval)
+
+	var summary ProjectOverviewSummary
+	err = h.db.Pool.QueryRow(
+		r.Context(),
+		fmt.Sprintf(`
+				SELECT
+					COUNT(*)::bigint,
+					COUNT(*) FILTER (WHERE status_code = 200)::bigint,
+					COUNT(*) FILTER (WHERE status_code = 429)::bigint,
+					COALESCE(SUM(prompt_tokens), 0)::bigint,
+					COALESCE(SUM(completion_tokens), 0)::bigint,
+					COALESCE(SUM(prompt_tokens + completion_tokens), 0)::bigint,
+					COALESCE(SUM(cost_usd), 0)::double precision
+				FROM usage_logs
+				WHERE %s
+			`, whereClause),
+		filterArgs...,
+	).Scan(
+		&summary.TotalRequests,
+		&summary.SuccessfulRequests,
+		&summary.BlockedRequests,
+		&summary.PromptTokens,
+		&summary.CompletionTokens,
+		&summary.TotalTokens,
+		&summary.TotalCostUSD,
+	)
+	if err != nil {
+		logger.Error("failed to fetch project overview summary", slog.Any("err", err))
+		utils.WriteError(w, http.StatusInternalServerError, "failed to fetch project overview")
+		return
+	}
+
+	volumeRows, err := h.db.Pool.Query(
+		r.Context(),
+		fmt.Sprintf(`
+				SELECT
+					%s AS bucket,
+					COUNT(*)::bigint,
+					COUNT(*) FILTER (WHERE status_code = 200)::bigint,
+					COUNT(*) FILTER (WHERE status_code = 429)::bigint
+				FROM usage_logs
+				WHERE %s
+				GROUP BY bucket
+				ORDER BY bucket ASC
+			`, intervalExpression, whereClause),
+		filterArgs...,
+	)
+	if err != nil {
+		logger.Error("failed to fetch project overview volume", slog.Any("err", err))
+		utils.WriteError(w, http.StatusInternalServerError, "failed to fetch project overview")
+		return
+	}
+	defer volumeRows.Close()
+
+	volume := make([]ProjectOverviewVolume, 0)
+	for volumeRows.Next() {
+		var bucket ProjectOverviewVolume
+		if err := volumeRows.Scan(
+			&bucket.Bucket,
+			&bucket.TotalRequests,
+			&bucket.SuccessfulRequests,
+			&bucket.BlockedRequests,
+		); err != nil {
+			logger.Error("failed to decode project overview volume", slog.Any("err", err))
+			utils.WriteError(w, http.StatusInternalServerError, "failed to fetch project overview")
+			return
+		}
+		volume = append(volume, bucket)
+	}
+	if err := volumeRows.Err(); err != nil {
+		logger.Error("failed to iterate project overview volume", slog.Any("err", err))
+		utils.WriteError(w, http.StatusInternalServerError, "failed to fetch project overview")
+		return
+	}
+
+	recentRows, err := h.db.Pool.Query(
+		r.Context(),
+		fmt.Sprintf(`
+				SELECT id, model, status_code, prompt_tokens, completion_tokens, cost_usd, created_at
+				FROM usage_logs
+				WHERE %s
+				ORDER BY created_at DESC
+				LIMIT 5
+			`, whereClause),
+		filterArgs...,
+	)
+	if err != nil {
+		logger.Error("failed to fetch recent project requests", slog.Any("err", err))
+		utils.WriteError(w, http.StatusInternalServerError, "failed to fetch project overview")
+		return
+	}
+	defer recentRows.Close()
+
+	recentRequests := make([]ProjectOverviewRequest, 0)
+	for recentRows.Next() {
+		var request ProjectOverviewRequest
+		if err := recentRows.Scan(
+			&request.ID,
+			&request.Model,
+			&request.StatusCode,
+			&request.PromptTokens,
+			&request.CompletionTokens,
+			&request.CostUSD,
+			&request.CreatedAt,
+		); err != nil {
+			logger.Error("failed to decode recent project request", slog.Any("err", err))
+			utils.WriteError(w, http.StatusInternalServerError, "failed to fetch project overview")
+			return
+		}
+		recentRequests = append(recentRequests, request)
+	}
+	if err := recentRows.Err(); err != nil {
+		logger.Error("failed to iterate recent project requests", slog.Any("err", err))
+		utils.WriteError(w, http.StatusInternalServerError, "failed to fetch project overview")
+		return
+	}
+
+	providerKeys, err := h.db.Queries.ListProviderKeysByProjectID(
+		r.Context(),
+		projectID,
+	)
+	if err != nil {
+		logger.Error("failed to fetch provider metadata", slog.Any("err", err))
+		utils.WriteError(w, http.StatusInternalServerError, "failed to fetch project overview")
+		return
+	}
+
+	provider := ""
+	providerKeyConfigured := false
+	for _, providerKey := range providerKeys {
+		if providerKey.IsActive {
+			provider = providerKey.Provider
+			providerKeyConfigured = true
+			break
+		}
+	}
+
+	proxyKeyPrefix := ""
+	activeKey, err := h.db.Queries.GetActiveKeyFromProjectID(
+		r.Context(),
+		projectID,
+	)
+	if err == nil {
+		proxyKeyPrefix = activeKey.KeyPrefix
+	} else if !errors.Is(err, pgx.ErrNoRows) {
+		logger.Error("failed to fetch proxy key metadata", slog.Any("err", err))
+		utils.WriteError(w, http.StatusInternalServerError, "failed to fetch project overview")
+		return
+	}
+
+	utils.WriteJSON(w, http.StatusOK, ProjectOverviewResponse{
+		Project: ProjectOverviewProject{
+			ID:                    project.ID,
+			Name:                  project.Name,
+			MonthlyBudget:         project.MonthlyBudget,
+			Spend:                 project.Spend,
+			Provider:              provider,
+			ProxyKeyPrefix:        proxyKeyPrefix,
+			ProviderKeyConfigured: providerKeyConfigured,
+		},
+		Range: ProjectOverviewRange{
+			From:     from,
+			To:       to,
+			Interval: interval,
+		},
+		Summary:        summary,
+		Volume:         volume,
+		RecentRequests: recentRequests,
+	})
 }

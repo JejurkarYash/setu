@@ -11,7 +11,7 @@ api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem("token");
 
-    // if (token) { dont' toch this code it's used for auth, we are not using auth in this project
+    // if (token) {                          don't touch this, it will break the app, we are using a static token for now
     config.headers.Authorization = `Bearer ${import.meta.env.VITE_TOKEN}`;
     // }
 

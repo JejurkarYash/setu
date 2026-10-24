@@ -5,14 +5,13 @@ import React, {
   useState,
   useEffect,
 } from "react";
-import type { Project, ApiKey, UsageLog, Provider } from "../types";
+import type { Project, ApiKey, Provider } from "../types";
 import {
   createProject as createProjectFromApi,
   fetchProjects as fetchProjectsFromApi,
 } from "../api/projectApi";
 import {
   sampleApiKeys,
-  sampleLogs,
   sampleAlerts,
 } from "../data/mockData";
 
@@ -40,21 +39,19 @@ interface ProjectContextType {
   projectsError: string | null;
   fetchProjects: () => Promise<void>;
   apiKeys: Record<string, ApiKey[]>;
-  logs: Record<string, UsageLog[]>;
   alerts: Record<string, AlertSetting>;
   createProject: (data: {
     name: string;
     monthly_budget: number;
     provider: Provider;
     providerKey: string;
-  }) => Promise<Project>;
+  }) => Promise<{ project: Project; apiKey: string }>;
   updateProject: (id: string, updates: Partial<Project>) => void;
   resetBudgetUsage: (id: string) => void;
   deleteProject: (id: string) => void;
   generateApiKey: (projectId: string) => ApiKey & { rawSecret: string };
   revokeApiKey: (projectId: string, keyId: string) => void;
   saveAlert: (projectId: string, alertData: Partial<AlertSetting>) => void;
-  addMockLog: (projectId: string, statusCode?: number) => void;
 }
 
 const ProjectContext = createContext<ProjectContextType | undefined>(undefined);
@@ -62,7 +59,6 @@ const ProjectContext = createContext<ProjectContextType | undefined>(undefined);
 const STORAGE_KEYS = {
   PROJECTS: "setu_projects",
   KEYS: "setu_api_keys",
-  LOGS: "setu_logs",
   ALERTS: "setu_alerts",
 };
 
@@ -70,7 +66,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
   const [projects, setProjects] = useState<Project[]>([]);
-  const [isLoadingProjects, setIsLoadingProjects] = useState(false);
+  const [isLoadingProjects, setIsLoadingProjects] = useState(true);
   const [projectsError, setProjectsError] = useState<string | null>(null);
 
   const [apiKeys, setApiKeys] = useState<Record<string, ApiKey[]>>(() => {
@@ -81,16 +77,6 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({
       console.error("Failed to load api keys from storage", e);
     }
     return sampleApiKeys;
-  });
-
-  const [logs, setLogs] = useState<Record<string, UsageLog[]>>(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEYS.LOGS);
-      if (saved) return JSON.parse(saved);
-    } catch (e) {
-      console.error("Failed to load logs from storage", e);
-    }
-    return sampleLogs;
   });
 
   const [alerts, setAlerts] = useState<Record<string, AlertSetting>>(() => {
@@ -129,20 +115,16 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({
   }, []);
 
   useEffect(() => {
+    void fetchProjects();
+  }, [fetchProjects]);
+
+  useEffect(() => {
     try {
       localStorage.setItem(STORAGE_KEYS.KEYS, JSON.stringify(apiKeys));
     } catch (e) {
       console.error(e);
     }
   }, [apiKeys]);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEYS.LOGS, JSON.stringify(logs));
-    } catch (e) {
-      console.error(e);
-    }
-  }, [logs]);
 
   useEffect(() => {
     try {
@@ -157,7 +139,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({
     monthly_budget: number;
     provider: Provider;
     providerKey: string;
-  }): Promise<Project> => {
+  }): Promise<{ project: Project; apiKey: string }> => {
     const response = await createProjectFromApi({
       name: data.name.trim(),
       monthly_budget: data.monthly_budget,
@@ -176,7 +158,10 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({
       throw new Error("Created project was not returned by the projects API");
     }
 
-    return createdProject;
+    return {
+      project: createdProject,
+      apiKey: response.api_key,
+    };
   };
 
   const updateProject = (id: string, updates: Partial<Project>) => {
@@ -194,11 +179,6 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({
   const deleteProject = (id: string) => {
     setProjects((prev) => prev.filter((p) => p.id !== id));
     setApiKeys((prev) => {
-      const copy = { ...prev };
-      delete copy[id];
-      return copy;
-    });
-    setLogs((prev) => {
       const copy = { ...prev };
       delete copy[id];
       return copy;
@@ -268,47 +248,6 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({
     });
   };
 
-  const addMockLog = (projectId: string, statusCode = 200) => {
-    const model = "unknown";
-
-    const promptTokens =
-      statusCode === 200 ? Math.floor(Math.random() * 200) + 20 : 0;
-    const completionTokens =
-      statusCode === 200 ? Math.floor(Math.random() * 80) + 10 : 0;
-    const cost =
-      statusCode === 200
-        ? Number(
-            (promptTokens * 0.000003 + completionTokens * 0.000015).toFixed(6),
-          )
-        : 0;
-
-    const newLog: UsageLog = {
-      id: `log-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
-      project_id: projectId,
-      model: statusCode === 200 ? model : "blocked_quota_exceeded",
-      prompt_tokens: promptTokens,
-      completion_tokens: completionTokens,
-      cost_usd: cost,
-      status_code: statusCode,
-      created_at: "Just now",
-    };
-
-    setLogs((prev) => ({
-      ...prev,
-      [projectId]: [newLog, ...(prev[projectId] ?? [])],
-    }));
-
-    if (cost > 0) {
-      setProjects((prev) =>
-        prev.map((p) =>
-          p.id === projectId
-            ? { ...p, spend: Number((p.spend + cost).toFixed(6)) }
-            : p,
-        ),
-      );
-    }
-  };
-
   return (
     <ProjectContext.Provider
       value={{
@@ -317,7 +256,6 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({
         projectsError,
         fetchProjects,
         apiKeys,
-        logs,
         alerts,
         createProject,
         updateProject,
@@ -326,7 +264,6 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({
         generateApiKey,
         revokeApiKey,
         saveAlert,
-        addMockLog,
       }}
     >
       {children}

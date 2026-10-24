@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -12,15 +12,20 @@ import {
   Lock,
 } from "lucide-react";
 import { useProjects } from "../../context/ProjectContext";
+import {
+  fetchProjectKeyMetadata,
+  generateProjectKey,
+} from "../../api/keyApi";
+import type { ApiKey } from "../../types";
 
 export default function ProjectKeysPage() {
   const { projectId } = useParams<{ projectId: string }>();
-  const { projects, apiKeys, generateApiKey } = useProjects();
+  const { projects, isLoadingProjects, projectsError } = useProjects();
 
   const project = projects.find((p) => p.id === projectId);
-  // Single active key contract for the project
-  const projectKeys = projectId ? (apiKeys[projectId] ?? []) : [];
-  const currentKey = projectKeys.find((k) => k.is_active) ?? projectKeys[0];
+  const [currentKey, setCurrentKey] = useState<ApiKey | null>(null);
+  const [isLoadingKey, setIsLoadingKey] = useState(true);
+  const [keyError, setKeyError] = useState<string | null>(null);
 
   const [showRotateConfirm, setShowRotateConfirm] = useState(false);
   const [newlyCreatedSecret, setNewlyCreatedSecret] = useState<string | null>(
@@ -28,6 +33,55 @@ export default function ProjectKeysPage() {
   );
   const [copiedSecret, setCopiedSecret] = useState(false);
   const [isRotating, setIsRotating] = useState(false);
+
+  useEffect(() => {
+    if (!projectId) {
+      setIsLoadingKey(false);
+      setKeyError("Project ID is missing");
+      return;
+    }
+
+    let isMounted = true;
+    setIsLoadingKey(true);
+    setKeyError(null);
+
+    fetchProjectKeyMetadata(projectId)
+      .then((key) => {
+        if (isMounted) setCurrentKey(key);
+      })
+      .catch((error) => {
+        if (!isMounted) return;
+        setKeyError(
+          error instanceof Error
+            ? error.message
+            : "Failed to load API key metadata",
+        );
+      })
+      .finally(() => {
+        if (isMounted) setIsLoadingKey(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [projectId]);
+
+  if (isLoadingProjects) {
+    return (
+      <div
+        style={{
+          maxWidth: "800px",
+          margin: "0 auto",
+          padding: "64px 16px",
+          textAlign: "center",
+          fontFamily: "'JetBrains Mono', monospace",
+          color: "#8e8e8e",
+        }}
+      >
+        Loading project...
+      </div>
+    );
+  }
 
   if (!project) {
     return (
@@ -41,7 +95,12 @@ export default function ProjectKeysPage() {
           color: "#ffffff",
         }}
       >
-        <h2 style={{ fontSize: "18px", fontWeight: 700 }}>Project not found</h2>
+        <h2 style={{ fontSize: "18px", fontWeight: 700 }}>
+          {projectsError ? "Unable to load project" : "Project not found"}
+        </h2>
+        {projectsError && (
+          <p style={{ fontSize: "12px", color: "#f87171" }}>{projectsError}</p>
+        )}
         <Link
           to="/dashboard"
           style={{
@@ -65,13 +124,18 @@ export default function ProjectKeysPage() {
   const handleConfirmRotation = async () => {
     if (!projectId) return;
     setIsRotating(true);
+    setKeyError(null);
     try {
       // Rotates key and generates a new raw secret string
-      const generated = await generateApiKey(projectId);
+      const generated = await generateProjectKey(projectId);
+      setCurrentKey(generated.key);
       setNewlyCreatedSecret(generated.rawSecret);
       setShowRotateConfirm(false);
     } catch (err) {
       console.error("Failed to rotate API Key:", err);
+      setKeyError(
+        err instanceof Error ? err.message : "Failed to rotate API key",
+      );
     } finally {
       setIsRotating(false);
     }
@@ -186,6 +250,21 @@ export default function ProjectKeysPage() {
         </button>
       </div>
 
+      {keyError && (
+        <div
+          role="alert"
+          style={{
+            padding: "12px 16px",
+            backgroundColor: "rgba(248, 113, 113, 0.08)",
+            border: "1px solid rgba(248, 113, 113, 0.3)",
+            color: "#fca5a5",
+            fontSize: "12px",
+          }}
+        >
+          {keyError}
+        </div>
+      )}
+
       {/* ── Active Key Card ────────────────────────────────────────── */}
       <div
         style={{
@@ -271,7 +350,9 @@ export default function ProjectKeysPage() {
                 boxSizing: "border-box",
               }}
             >
-              {currentKey?.key_prefix ?? "setu_live"}_••••••••••••••••
+              {isLoadingKey
+                ? "Loading..."
+                : `${currentKey?.key_prefix ?? "Unavailable"}_••••••••••••••••`}
             </div>
           </div>
 
@@ -307,7 +388,14 @@ export default function ProjectKeysPage() {
               }}
             >
               <span>SHA-256 HASHED</span>
-              <span style={{ color: "#34D399", fontWeight: 600 }}>ACTIVE</span>
+              <span
+                style={{
+                  color: currentKey?.is_active ? "#34D399" : "#f87171",
+                  fontWeight: 600,
+                }}
+              >
+                {currentKey?.is_active ? "ACTIVE" : "INACTIVE"}
+              </span>
             </div>
           </div>
         </div>
@@ -329,13 +417,15 @@ export default function ProjectKeysPage() {
             CREATED:{" "}
             {currentKey?.created_at
               ? new Date(currentKey.created_at).toLocaleDateString()
-              : "ACTIVE"}
+              : isLoadingKey
+                ? "LOADING"
+                : "NOT AVAILABLE"}
           </span>
           <span>
             LAST USED:{" "}
             {currentKey?.last_used_at
               ? new Date(currentKey.last_used_at).toLocaleDateString()
-              : "JUST NOW"}
+              : "NOT AVAILABLE"}
           </span>
         </div>
       </div>

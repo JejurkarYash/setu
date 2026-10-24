@@ -1,11 +1,29 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { Plus, Sparkles, AlertCircle, RefreshCw } from "lucide-react";
+import {
+  Plus,
+  Sparkles,
+  AlertCircle,
+  RefreshCw,
+  Copy,
+  Check,
+  ShieldAlert,
+} from "lucide-react";
 import { useProjects } from "../context/ProjectContext";
 import { ProjectCard } from "../components/project/ProjectCard";
 import CreateProjectModal from "../components/project/CreateProjectModal";
 import type { Provider } from "../types";
+
+// Type for the created project response including the one-time raw API key
+type CreatedProjectData = {
+  id: string;
+  name: string;
+  budget: number;
+  provider: string;
+  apiKey: string;
+  keyPrefix: string;
+};
 
 export default function DashboardPage() {
   const navigate = useNavigate();
@@ -16,11 +34,14 @@ export default function DashboardPage() {
     isLoadingProjects,
     projectsError,
   } = useProjects();
+
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  useEffect(() => {
-    void fetchProjects();
-  }, [fetchProjects]);
+  // One-time API Key Reveal Dialog state
+  const [newlyCreatedProject, setNewlyCreatedProject] =
+    useState<CreatedProjectData | null>(null);
+  const [hasCopiedKey, setHasCopiedKey] = useState(false);
+  const [acknowledgedWarning, setAcknowledgedWarning] = useState(false);
 
   const handleCreateProject = async (data: {
     name: string;
@@ -29,7 +50,41 @@ export default function DashboardPage() {
     providerKey: string;
   }) => {
     const created = await createProject(data);
-    navigate(`/dashboard/project/${created.id}`);
+    setIsModalOpen(false);
+
+    // Set the newly created project response to show the one-time key modal
+    setNewlyCreatedProject({
+      id: created.project.id,
+      name: created.project.name,
+      budget: created.project.monthly_budget,
+      provider: data.provider,
+      apiKey: created.apiKey,
+      keyPrefix: created.apiKey.slice(0, 13),
+    });
+    setHasCopiedKey(false);
+    setAcknowledgedWarning(false);
+
+    return {
+      projectId: created.project.id,
+      apiKey: created.apiKey,
+    };
+  };
+
+  const handleCopyKey = async (apiKey: string) => {
+    try {
+      await navigator.clipboard.writeText(apiKey);
+      setHasCopiedKey(true);
+      setTimeout(() => setHasCopiedKey(false), 3000);
+    } catch (err) {
+      console.error("Failed to copy API key", err);
+    }
+  };
+
+  const handleCloseApiKeyModal = () => {
+    if (!newlyCreatedProject) return;
+    const projectId = newlyCreatedProject.id;
+    setNewlyCreatedProject(null);
+    navigate(`/dashboard/project/${projectId}`);
   };
 
   return (
@@ -345,7 +400,276 @@ export default function DashboardPage() {
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         onSubmit={handleCreateProject}
+        onProjectContinue={(projectId) => {
+          setIsModalOpen(false);
+          navigate(`/dashboard/project/${projectId}`);
+        }}
       />
+
+      {/* ── One-Time API Key Reveal Modal ───────────────────────────── */}
+      <AnimatePresence>
+        {newlyCreatedProject && (
+          <div
+            style={{
+              position: "fixed",
+              top: 0,
+              left: 0,
+              width: "100vw",
+              height: "100vh",
+              backgroundColor: "rgba(0, 0, 0, 0.8)",
+              backdropFilter: "blur(4px)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              zIndex: 100,
+              padding: "16px",
+              boxSizing: "border-box",
+            }}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 10 }}
+              style={{
+                width: "100%",
+                maxWidth: "540px",
+                backgroundColor: "#121212",
+                border: "1px solid #262626",
+                padding: "28px",
+                display: "flex",
+                flexDirection: "column",
+                gap: "24px",
+                boxSizing: "border-box",
+                boxShadow: "0 20px 40px rgba(0,0,0,0.6)",
+              }}
+            >
+              {/* Modal Header */}
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  borderBottom: "1px solid #1f1f1f",
+                  paddingBottom: "16px",
+                }}
+              >
+                <div
+                  style={{ display: "flex", alignItems: "center", gap: "10px" }}
+                >
+                  <ShieldAlert size={20} color="#34D399" />
+                  <h2
+                    style={{
+                      fontSize: "16px",
+                      fontWeight: 700,
+                      color: "#ffffff",
+                      margin: 0,
+                      fontFamily: "'JetBrains Mono', monospace",
+                      letterSpacing: "-0.02em",
+                    }}
+                  >
+                    PROJECT CREATED SUCCESSFULLY
+                  </h2>
+                </div>
+              </div>
+
+              {/* Warning Banner */}
+              <div
+                style={{
+                  padding: "14px 16px",
+                  backgroundColor: "rgba(248, 113, 113, 0.08)",
+                  border: "1px solid rgba(248, 113, 113, 0.3)",
+                  display: "flex",
+                  gap: "12px",
+                  alignItems: "flex-start",
+                }}
+              >
+                <AlertCircle
+                  size={18}
+                  color="#f87171"
+                  style={{ flexShrink: 0, marginTop: "2px" }}
+                />
+                <div
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "4px",
+                  }}
+                >
+                  <span
+                    style={{
+                      fontSize: "12px",
+                      fontWeight: 700,
+                      color: "#f87171",
+                      fontFamily: "'JetBrains Mono', monospace",
+                    }}
+                  >
+                    Save your Proxy API Key now
+                  </span>
+                  <span
+                    style={{
+                      fontSize: "12px",
+                      color: "#a1a1aa",
+                      lineHeight: 1.5,
+                    }}
+                  >
+                    This is the <strong>only time</strong> your raw API key will
+                    be displayed. For security reasons, we do not store the
+                    unhashed key. If you lose it, you will need to generate a
+                    new one.
+                  </span>
+                </div>
+              </div>
+
+              {/* Key Display Box */}
+              <div
+                style={{ display: "flex", flexDirection: "column", gap: "8px" }}
+              >
+                <span
+                  style={{
+                    fontSize: "11px",
+                    fontFamily: "'JetBrains Mono', monospace",
+                    fontWeight: 700,
+                    color: "#71717a",
+                    textTransform: "uppercase",
+                  }}
+                >
+                  Proxy API Key ({newlyCreatedProject.name})
+                </span>
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    padding: "12px 16px",
+                    backgroundColor: "#171717",
+                    border: "1px solid #222222",
+                    fontFamily: "'JetBrains Mono', monospace",
+                    fontSize: "13px",
+                    color: "#34D399",
+                    gap: "12px",
+                    wordBreak: "break-all",
+                  }}
+                >
+                  <span style={{ userSelect: "all" }}>
+                    {newlyCreatedProject.apiKey}
+                  </span>
+                  <motion.button
+                    type="button"
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => handleCopyKey(newlyCreatedProject.apiKey)}
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: "6px",
+                      padding: "8px 12px",
+                      backgroundColor: hasCopiedKey
+                        ? "rgba(52, 211, 153, 0.15)"
+                        : "#222222",
+                      border: "1px solid",
+                      borderColor: hasCopiedKey ? "#34D399" : "#333333",
+                      color: hasCopiedKey ? "#34D399" : "#ffffff",
+                      fontSize: "11px",
+                      fontFamily: "'JetBrains Mono', monospace",
+                      fontWeight: 600,
+                      cursor: "pointer",
+                      flexShrink: 0,
+                    }}
+                  >
+                    {hasCopiedKey ? (
+                      <>
+                        <Check size={14} color="#34D399" />
+                        <span>COPIED</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy size={14} color="#C084FC" />
+                        <span>COPY KEY</span>
+                      </>
+                    )}
+                  </motion.button>
+                </div>
+                <span
+                  style={{
+                    fontSize: "11px",
+                    color: "#71717a",
+                    fontFamily: "'JetBrains Mono', monospace",
+                  }}
+                >
+                  Key Prefix:{" "}
+                  <code style={{ color: "#C084FC" }}>
+                    {newlyCreatedProject.keyPrefix}...
+                  </code>
+                </span>
+              </div>
+
+              {/* Acknowledgment Checkbox */}
+              <label
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "10px",
+                  cursor: "pointer",
+                  fontSize: "12px",
+                  color: "#d4d4d8",
+                  fontFamily: "'JetBrains Mono', monospace",
+                  marginTop: "4px",
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={acknowledgedWarning}
+                  onChange={(e) => setAcknowledgedWarning(e.target.checked)}
+                  style={{
+                    width: "16px",
+                    height: "16px",
+                    accentColor: "#34D399",
+                    cursor: "pointer",
+                  }}
+                />
+                <span>
+                  I have safely copied and stored this API key in a secure
+                  location.
+                </span>
+              </label>
+
+              {/* Action Button */}
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "flex-end",
+                  marginTop: "8px",
+                }}
+              >
+                <motion.button
+                  type="button"
+                  disabled={!acknowledgedWarning}
+                  whileHover={acknowledgedWarning ? { scale: 1.02 } : {}}
+                  whileTap={acknowledgedWarning ? { scale: 0.98 } : {}}
+                  onClick={handleCloseApiKeyModal}
+                  style={{
+                    padding: "10px 24px",
+                    backgroundColor: acknowledgedWarning
+                      ? "#ffffff"
+                      : "#1f1f1f",
+                    color: acknowledgedWarning ? "#000000" : "#71717a",
+                    fontWeight: 700,
+                    fontSize: "12px",
+                    fontFamily: "'JetBrains Mono', monospace",
+                    border: "none",
+                    cursor: acknowledgedWarning ? "pointer" : "not-allowed",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.05em",
+                    transition: "all 0.2s ease",
+                  }}
+                >
+                  Continue to Project
+                </motion.button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 }

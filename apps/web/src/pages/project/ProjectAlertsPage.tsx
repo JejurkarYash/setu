@@ -6,6 +6,12 @@ import {
   useProjects,
   type NotificationChannel,
 } from "../../context/ProjectContext";
+import {
+  createAlertConfig,
+  fetchAlertConfig,
+  updateAlertConfig,
+  type AlertConfig,
+} from "../../api/alertApi";
 
 // Official Color Slack SVG Icon
 function SlackBrandIcon({ size = 16 }: { size?: number }) {
@@ -70,32 +76,61 @@ function EmailBrandIcon({ size = 16 }: { size?: number }) {
 
 export default function ProjectAlertsPage() {
   const { projectId } = useParams<{ projectId: string }>();
-  const { projects, alerts, saveAlert } = useProjects();
+  const { projects, isLoadingProjects, projectsError } = useProjects();
 
   const project = projects.find((p) => p.id === projectId);
-  const currentAlert = projectId ? alerts[projectId] : undefined;
+  const [alertConfig, setAlertConfig] = useState<AlertConfig | null>(null);
+  const [isLoadingAlert, setIsLoadingAlert] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
 
   const [alertsEnabled, setAlertsEnabled] = useState(false);
   const [thresholdPct, setThresholdPct] = useState(80);
   const [channels, setChannels] = useState<NotificationChannel[]>([]);
 
   useEffect(() => {
-    if (currentAlert) {
-      setAlertsEnabled(currentAlert.enabled ?? false);
-      setThresholdPct(currentAlert.trigger_threshold_pct ?? 80);
-      setChannels(
-        currentAlert.channels ?? [
-          {
-            id: "slack-1",
-            type: "slack",
-            webhookUrl:
-              "https://hooks.slack.com/services/T000/B000/XXXXXXXXXXXXXXXXXXXX",
-            enabled: true,
-          },
-        ],
-      );
+    if (!projectId) {
+      setIsLoadingAlert(false);
+      return;
     }
-  }, [currentAlert]);
+
+    let isMounted = true;
+    setIsLoadingAlert(true);
+    setErrorMsg(null);
+
+    fetchAlertConfig(projectId)
+      .then((config) => {
+        if (!isMounted) return;
+        setAlertConfig(config);
+        setAlertsEnabled(config?.notify_slack ?? false);
+        setThresholdPct(config?.trigger_threshold_pct ?? 80);
+        setChannels(
+          config?.notify_slack
+            ? [
+                {
+                  id: "slack-configured",
+                  type: "slack",
+                  enabled: true,
+                },
+              ]
+            : [],
+        );
+      })
+      .catch((error) => {
+        if (!isMounted) return;
+        setErrorMsg(
+          error instanceof Error
+            ? error.message
+            : "Failed to load alert configuration",
+        );
+      })
+      .finally(() => {
+        if (isMounted) setIsLoadingAlert(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [projectId]);
 
   const [selectedChannelType, setSelectedChannelType] = useState<
     "slack" | "email"
@@ -104,6 +139,23 @@ export default function ProjectAlertsPage() {
   const [testSentId, setTestSentId] = useState<string | null>(null);
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  if (isLoadingProjects || isLoadingAlert) {
+    return (
+      <div
+        style={{
+          maxWidth: "800px",
+          margin: "0 auto",
+          padding: "64px 16px",
+          textAlign: "center",
+          fontFamily: "'JetBrains Mono', monospace",
+          color: "#8e8e8e",
+        }}
+      >
+        Loading alert configuration...
+      </div>
+    );
+  }
 
   if (!project) {
     return (
@@ -117,7 +169,9 @@ export default function ProjectAlertsPage() {
           color: "#ffffff",
         }}
       >
-        <h2 style={{ fontSize: "18px", fontWeight: 700 }}>Project not found</h2>
+        <h2 style={{ fontSize: "18px", fontWeight: 700 }}>
+          {projectsError ? "Unable to load project" : "Project not found"}
+        </h2>
         <Link
           to="/dashboard"
           style={{
@@ -162,18 +216,39 @@ export default function ProjectAlertsPage() {
     setChannels((prev) => prev.filter((c) => c.id !== id));
   };
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!projectId) return;
 
-    saveAlert(projectId, {
-      enabled: alertsEnabled,
-      trigger_threshold_pct: thresholdPct,
-      channels: channels,
-    });
+    setIsSaving(true);
+    setErrorMsg(null);
 
-    setSavedSuccess(true);
-    setTimeout(() => setSavedSuccess(false), 2500);
+    try {
+      const webhook = channels.find(
+        (channel) => channel.type === "slack" && channel.webhookUrl,
+      )?.webhookUrl;
+      const payload = {
+        trigger_threshold: thresholdPct,
+        notify_slack: alertsEnabled,
+        ...(webhook ? { slack_webhook_url: webhook } : {}),
+      };
+      const saved = alertConfig
+        ? await updateAlertConfig(projectId, payload)
+        : await createAlertConfig(projectId, payload);
+
+      setAlertConfig(saved);
+      setNewWebhookUrl("");
+      setSavedSuccess(true);
+      setTimeout(() => setSavedSuccess(false), 2500);
+    } catch (error) {
+      setErrorMsg(
+        error instanceof Error
+          ? error.message
+          : "Failed to save alert configuration",
+      );
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleSendTestAlert = (channelId: string) => {
@@ -741,7 +816,9 @@ export default function ProjectAlertsPage() {
                             color: "#71717a",
                           }}
                         >
-                          {channel.webhookUrl?.slice(0, 35)}...
+                          {channel.webhookUrl
+                            ? `${channel.webhookUrl.slice(0, 35)}...`
+                            : "CONFIGURED"}
                         </span>
                       </div>
                     </div>
@@ -845,6 +922,7 @@ export default function ProjectAlertsPage() {
         <div style={{ display: "flex", justifyContent: "flex-end" }}>
           <motion.button
             type="submit"
+            disabled={isSaving || isLoadingAlert}
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
             style={{
@@ -860,7 +938,7 @@ export default function ProjectAlertsPage() {
               boxShadow: "0 2px 8px rgba(0,0,0,0.4)",
             }}
           >
-            SAVE ALERT CONFIGURATION
+            {isSaving ? "SAVING..." : "SAVE ALERT CONFIGURATION"}
           </motion.button>
         </div>
       </form>

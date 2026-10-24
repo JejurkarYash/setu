@@ -1,7 +1,15 @@
 import { useState } from "react";
 import axios from "axios";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Lock, ShieldAlert, Loader2, AlertCircle } from "lucide-react";
+import {
+  X,
+  Lock,
+  ShieldAlert,
+  Loader2,
+  AlertCircle,
+  Copy,
+  Check,
+} from "lucide-react";
 import type { Provider } from "../../types";
 
 type CreateProjectModalProps = {
@@ -12,13 +20,15 @@ type CreateProjectModalProps = {
     monthly_budget: number;
     provider: Provider;
     providerKey: string;
-  }) => void | Promise<void>;
+  }) => Promise<{ projectId: string; apiKey: string }>;
+  onProjectContinue: (projectId: string) => void;
 };
 
 export default function CreateProjectModal({
   isOpen,
   onClose,
   onSubmit,
+  onProjectContinue,
 }: CreateProjectModalProps) {
   const [name, setName] = useState("");
   const [budget, setBudget] = useState("100.00");
@@ -27,6 +37,11 @@ export default function CreateProjectModal({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [nameError, setNameError] = useState<string | null>(null);
+  const [createdProject, setCreatedProject] = useState<{
+    projectId: string;
+    apiKey: string;
+  } | null>(null);
+  const [hasCopiedKey, setHasCopiedKey] = useState(false);
 
   const resetFormState = () => {
     setName("");
@@ -35,6 +50,8 @@ export default function CreateProjectModal({
     setProvider("openai");
     setFormError(null);
     setNameError(null);
+    setCreatedProject(null);
+    setHasCopiedKey(false);
   };
 
   const handleClose = () => {
@@ -58,15 +75,14 @@ export default function CreateProjectModal({
     setIsSubmitting(true);
 
     try {
-      await onSubmit({
+      const result = await onSubmit({
         name: name.trim(),
         monthly_budget: monthlyBudget,
         provider,
         providerKey: providerKey.trim(),
       });
 
-      resetFormState();
-      onClose();
+      setCreatedProject(result);
     } catch (error) {
       if (axios.isAxiosError(error)) {
         const serverMessage =
@@ -190,6 +206,86 @@ export default function CreateProjectModal({
             </div>
 
             {/* Modal Form */}
+            {createdProject ? (
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "18px",
+                }}
+              >
+                <div>
+                  <h4 style={{ margin: 0, color: "#34D399", fontSize: "16px" }}>
+                    Project created successfully
+                  </h4>
+                  <p style={{ color: "#a1a1aa", fontSize: "12px", lineHeight: 1.5 }}>
+                    Copy this Setu API key now. For security, it will not be
+                    shown again.
+                  </p>
+                </div>
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "8px",
+                    padding: "12px",
+                    backgroundColor: "#171717",
+                    border: "1px solid rgba(52, 211, 153, 0.35)",
+                  }}
+                >
+                  <code
+                    style={{
+                      flex: 1,
+                      color: "#ffffff",
+                      fontSize: "12px",
+                      wordBreak: "break-all",
+                    }}
+                  >
+                    {createdProject.apiKey}
+                  </code>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      void navigator.clipboard.writeText(createdProject.apiKey);
+                      setHasCopiedKey(true);
+                    }}
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: "6px",
+                      padding: "8px 10px",
+                      color: "#ffffff",
+                      backgroundColor: "#262626",
+                      border: "1px solid #3f3f46",
+                      cursor: "pointer",
+                      flexShrink: 0,
+                    }}
+                  >
+                    {hasCopiedKey ? <Check size={14} /> : <Copy size={14} />}
+                    {hasCopiedKey ? "Copied" : "Copy"}
+                  </button>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const projectId = createdProject.projectId;
+                    resetFormState();
+                    onProjectContinue(projectId);
+                  }}
+                  style={{
+                    alignSelf: "flex-end",
+                    padding: "10px 18px",
+                    color: "#000000",
+                    backgroundColor: "#ffffff",
+                    border: "none",
+                    fontWeight: 700,
+                    cursor: "pointer",
+                  }}
+                >
+                  Continue to Project
+                </button>
+              </div>
+            ) : (
             <form
               onSubmit={handleSubmit}
               style={{ display: "flex", flexDirection: "column", gap: "20px" }}
@@ -538,6 +634,7 @@ export default function CreateProjectModal({
                 </motion.button>
               </div>
             </form>
+            )}
           </motion.div>
         </div>
       )}

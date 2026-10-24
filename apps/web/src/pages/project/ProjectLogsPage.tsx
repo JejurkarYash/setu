@@ -1,9 +1,8 @@
-import { useState, useMemo } from "react";
+import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Search,
-  AlertTriangle,
   Terminal,
   DollarSign,
   X,
@@ -13,23 +12,74 @@ import {
   ChevronsRight,
 } from "lucide-react";
 import { useProjects } from "../../context/ProjectContext";
+import { fetchProjectLogs } from "../../api/logApi";
+import type { UsageLog } from "../../types";
 
 export default function ProjectLogsPage() {
   const { projectId } = useParams<{ projectId: string }>();
-  const { projects, logs } = useProjects();
+  const { projects, isLoadingProjects, projectsError } = useProjects();
 
   const project = projects.find((p) => p.id === projectId);
-  const projectLogs = projectId ? (logs[projectId] ?? []) : [];
+  const [projectLogs, setProjectLogs] = useState<UsageLog[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [hasNextPage, setHasNextPage] = useState(false);
 
   const [filterStatus, setFilterStatus] = useState<"all" | "200" | "429">(
     "all",
   );
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedLog, setSelectedLog] = useState<any | null>(null);
+  const [selectedLog, setSelectedLog] = useState<UsageLog | null>(null);
 
-  // Pagination States
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
+
+  useEffect(() => {
+    if (!projectId) return;
+
+    let isMounted = true;
+    setIsLoading(true);
+    setLoadError(null);
+
+    fetchProjectLogs(projectId, pageSize, (currentPage - 1) * pageSize)
+      .then((logs) => {
+        if (!isMounted) return;
+        setProjectLogs(logs);
+        setHasNextPage(logs.length === pageSize);
+      })
+      .catch((error) => {
+        if (!isMounted) return;
+        setProjectLogs([]);
+        setHasNextPage(false);
+        setLoadError(
+          error instanceof Error ? error.message : "Failed to load request logs",
+        );
+      })
+      .finally(() => {
+        if (isMounted) setIsLoading(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [projectId, currentPage, pageSize]);
+
+  if (isLoadingProjects) {
+    return (
+      <div
+        style={{
+          maxWidth: "800px",
+          margin: "0 auto",
+          padding: "64px 16px",
+          textAlign: "center",
+          fontFamily: "'JetBrains Mono', monospace",
+          color: "#8e8e8e",
+        }}
+      >
+        Loading project...
+      </div>
+    );
+  }
 
   if (!project) {
     return (
@@ -43,7 +93,12 @@ export default function ProjectLogsPage() {
           color: "#ffffff",
         }}
       >
-        <h2 style={{ fontSize: "18px", fontWeight: 700 }}>Project not found</h2>
+        <h2 style={{ fontSize: "18px", fontWeight: 700 }}>
+          {projectsError ? "Unable to load project" : "Project not found"}
+        </h2>
+        {projectsError && (
+          <p style={{ fontSize: "12px", color: "#f87171" }}>{projectsError}</p>
+        )}
         <Link
           to="/dashboard"
           style={{
@@ -65,37 +120,31 @@ export default function ProjectLogsPage() {
   }
 
   // Filtered dataset
-  const filteredLogs = useMemo(() => {
-    return projectLogs.filter((log) => {
-      const matchesStatus =
-        filterStatus === "all" ||
-        (filterStatus === "200" && log.status_code === 200) ||
-        (filterStatus === "429" && log.status_code === 429);
+  const filteredLogs = projectLogs.filter((log) => {
+    const matchesStatus =
+      filterStatus === "all" ||
+      (filterStatus === "200" && log.status_code === 200) ||
+      (filterStatus === "429" && log.status_code === 429);
 
-      const matchesSearch =
-        searchQuery.trim() === "" ||
-        log.model.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        log.id.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesSearch =
+      searchQuery.trim() === "" ||
+      log.model.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      log.id.toLowerCase().includes(searchQuery.toLowerCase());
 
-      return matchesStatus && matchesSearch;
-    });
-  }, [projectLogs, filterStatus, searchQuery]);
+    return matchesStatus && matchesSearch;
+  });
 
   // Total cost across filtered logs
   const totalCost = filteredLogs.reduce((acc, l) => acc + l.cost_usd, 0);
 
-  // Pagination Calculations
-  const totalPages = Math.max(1, Math.ceil(filteredLogs.length / pageSize));
-  const activePage = Math.min(currentPage, totalPages);
-
-  const paginatedLogs = useMemo(() => {
-    const startIndex = (activePage - 1) * pageSize;
-    return filteredLogs.slice(startIndex, startIndex + pageSize);
-  }, [filteredLogs, activePage, pageSize]);
+  const activePage = currentPage;
+  const totalPages = hasNextPage ? currentPage + 1 : currentPage;
+  const paginatedLogs = filteredLogs;
 
   const handlePageChange = (newPage: number) => {
-    if (newPage >= 1 && newPage <= totalPages) {
+    if (newPage >= 1 && (newPage <= currentPage || (newPage === currentPage + 1 && hasNextPage))) {
       setCurrentPage(newPage);
+      setSelectedLog(null);
     }
   };
 
@@ -355,7 +404,32 @@ export default function ProjectLogsPage() {
           boxSizing: "border-box",
         }}
       >
-        {filteredLogs.length === 0 ? (
+        {isLoading ? (
+          <div
+            style={{
+              padding: "48px 0",
+              textAlign: "center",
+              fontSize: "12px",
+              fontFamily: "'JetBrains Mono', monospace",
+              color: "#71717a",
+            }}
+          >
+            Loading telemetry records...
+          </div>
+        ) : loadError ? (
+          <div
+            role="alert"
+            style={{
+              padding: "48px 0",
+              textAlign: "center",
+              fontSize: "12px",
+              fontFamily: "'JetBrains Mono', monospace",
+              color: "#f87171",
+            }}
+          >
+            {loadError}
+          </div>
+        ) : filteredLogs.length === 0 ? (
           <div
             style={{
               padding: "48px 0",
@@ -498,7 +572,7 @@ export default function ProjectLogsPage() {
         )}
 
         {/* ── Pagination Controls Bar ────────────────────────────── */}
-        {filteredLogs.length > 0 && (
+        {!isLoading && !loadError && projectLogs.length > 0 && (
           <div
             style={{
               display: "flex",
@@ -544,17 +618,13 @@ export default function ProjectLogsPage() {
             <div>
               SHOWING{" "}
               <strong style={{ color: "#ffffff" }}>
-                {(activePage - 1) * pageSize + 1}
+              {(activePage - 1) * pageSize + 1}
               </strong>{" "}
               -{" "}
               <strong style={{ color: "#ffffff" }}>
-                {Math.min(activePage * pageSize, filteredLogs.length)}
+              {(activePage - 1) * pageSize + filteredLogs.length}
               </strong>{" "}
-              OF{" "}
-              <strong style={{ color: "#ffffff" }}>
-                {filteredLogs.length}
-              </strong>{" "}
-              LOGS
+              LOGS ON THIS PAGE
             </div>
 
             {/* Navigation Buttons */}
