@@ -305,7 +305,7 @@ export default function Sidebar({
                   <img
                     src="/Setu_Icon_Sidebar.svg"
                     alt="Setu"
-                    className=" size-10 w-auto max-w-full object-contain"
+                    className=" size-9 w-auto max-w-full object-contain"
                   />
                 </button>
 
