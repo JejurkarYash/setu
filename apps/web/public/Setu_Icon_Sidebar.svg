@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 48" width="100%" height="100%">
+  <defs>
+    <!-- Solid Orchid Fill -->
+    <linearGradient id="setu-orchid" x1="0%" y1="100%" x2="0%" y2="0%">
+      <stop offset="0%" stop-color="#ca55e3" />
+      <stop offset="100%" stop-color="#e078ff" />
+    </linearGradient>
+
+    <!-- Clean White Text Gradient -->
+    <linearGradient id="text-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff" />
+      <stop offset="100%" stop-color="#f3f4f6" />
+    </linearGradient>
+  </defs>
+
+  <!-- Transparent Background for Sidebar -->
+  <rect width="240" height="48" fill="transparent" />
+
+  <!-- 1. SETU ARCH LOGO MARK -->
+  <g transform="translate(6, 4) scale(0.15)">
+    <!-- Outer Arch -->
+    <path d="M 10,260 C 20,120 90,20 150,20 C 210,20 280,120 290,260 C 265,260 235,170 150,170 C 65,170 35,260 10,260 Z" fill="url(#setu-orchid)" />
+
+    <!-- Inner Chevron -->
+    <path d="M 60,260 C 80,195 115,130 150,130 C 185,130 220,195 240,260 C 220,260 190,190 150,190 C 110,190 80,260 60,260 Z" fill="#ffffff" opacity="0.95" />
+
+    <!-- Central Point Node -->
+    <circle cx="150" cy="100" r="14" fill="#ffffff" />
+  </g>
+
+  <!-- 2. BRAND NAME "Setu" -->
+  <text x="56" y="30" font-family="Inter, -apple-system, BlinkMacSystemFont, &#39;SF Pro Display&#39;, &#39;Segoe UI&#39;, Roboto, sans-serif" font-size="22" font-weight="700" letter-spacing="-0.03em" fill="url(#text-grad)">Setu</text>
+
+  <!-- 3. DIVIDER SEPARATOR LINE -->
+  <line x1="120" y1="16" x2="120" y2="32" stroke="#ffffff" stroke-opacity="0.15" stroke-width="1" />
+
+  <!-- 4. CLEAN & FIXED STATUS PILL BADGE -->
+  <g transform="translate(130, 14)">
+    <!-- Pill Container Background & Border (Expanded width to 66px to fix overflow) -->
+    <rect width="66" height="20" rx="10" fill="#10b981" fill-opacity="0.12" stroke="#10b981" stroke-opacity="0.3" stroke-width="1" />
+
+    <!-- Active Pulse Dot -->
+    <circle cx="12" cy="10" r="3.5" fill="#10b981" />
+
+    <!-- Label Text -->
+    <text x="21" y="13.5" font-family="Inter, -apple-system, BlinkMacSystemFont, sans-serif" font-size="9" font-weight="700" letter-spacing="0.08em" fill="#10b981">PROXY</text>
+  </g>
+</svg>

@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
+  
+  <g transform="translate(106, 116)">
+    <!-- Primary Arch (Setu Bridge) -->
+    <path d="M 10,260 C 20,120 90,20 150,20 C 210,20 280,120 290,260 C 265,260 235,170 150,170 C 65,170 35,260 10,260 Z" fill="#e078ff" data-index="0" style="opacity: 1;"></path>
+    <!-- Inner Gateway Chevron -->
+    <path d="M 60,260 C 80,195 115,130 150,130 C 185,130 220,195 240,260 C 220,260 190,190 150,190 C 110,190 80,260 60,260 Z" fill="#ffffff" opacity="0.9" data-index="1" style="opacity: 1;"></path>
+    <!-- Center Data Node Dot -->
+    <circle cx="150" cy="100" r="12" fill="#ffffff"></circle>
+  </g>
+</svg>

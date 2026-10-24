@@ -70,23 +70,12 @@ export const getProjectNavItems = (projectId: string): NavItem[] => [
   },
 ];
 
-function BrandMark() {
+function BrandMark({ collapsed }: { collapsed: boolean }) {
   return (
-    <span className="flex size-8 shrink-0    items-center justify-center bg-brand text-background shadow-md shadow-brand/25">
-      <svg
-        aria-hidden="true"
-        className="size-4"
-        viewBox="0 0 24 24"
-        fill="none"
-      >
-        <path
-          d="M6 6.5 12 3l6 3.5v7L12 17l-6-3.5v-7Z"
-          stroke="currentColor"
-          strokeWidth="2.2"
-          strokeLinejoin="round"
-        />
-        <path d="m9 12 3 1.75L15 12" stroke="currentColor" strokeWidth="2.2" />
-      </svg>
+    <span
+      className={`flex  shrink-0 items-center justify-center overflow-hidden shadow-md  ${collapsed ? "size-14" : "size-16"} `}
+    >
+      <img src="/Setu_Icon.svg" alt="Setu" className="size-full object-cover" />
     </span>
   );
 }
@@ -299,23 +288,26 @@ export default function Sidebar({
                       </motion.div>
                     ) : (
                       <motion.div key="brand-mark">
-                        <BrandMark />
+                        <BrandMark collapsed={collapsed} />
                       </motion.div>
                     )}
                   </AnimatePresence>
                 </button>
               </div>
             ) : (
-              <div className="flex w-full items-center justify-center gap-26 left-2 ">
-                <div
-                  className="flex items-center gap-3 cursor-pointer "
+              <div className="flex w-full items-center justify-between gap-3">
+                <button
+                  type="button"
                   onClick={() => navigate("/dashboard")}
+                  className="flex min-w-0 flex-1 items-center justify-start cursor-pointer"
+                  aria-label="Go to dashboard"
                 >
-                  <BrandMark />
-                  <span className="text-sm font-semibold tracking-wide text-white whitespace-nowrap">
-                    Setu
-                  </span>
-                </div>
+                  <img
+                    src="/Setu_Icon_Sidebar.svg"
+                    alt="Setu"
+                    className=" size-10 w-auto max-w-full object-contain"
+                  />
+                </button>
 
                 <button
                   type="button"
