@@ -11,9 +11,9 @@ api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem("token");
 
-    // if (token) {                          don't touch this, it will break the app, we are using a static token for now
-    config.headers.Authorization = `Bearer ${import.meta.env.VITE_TOKEN}`;
-    // }
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
 
     return config;
   },

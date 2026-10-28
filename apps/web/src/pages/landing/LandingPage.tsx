@@ -2,7 +2,7 @@ import LandingNavbar from "./components/LandingNavbar";
 import HeroSection from "./components/HeroSection";
 import PerformanceBenchmarks from "./components/PerformanceBenchmarks";
 import ProblemSolutionSection from "./components/ProblemSolutionSection";
-
+import FeaturesSection from "./components/FeaturesSection";
 export default function LandingPage() {
   return (
     <div
@@ -18,7 +18,7 @@ export default function LandingPage() {
         <HeroSection />
         <PerformanceBenchmarks />
         <ProblemSolutionSection />
-        {/* <FeaturesSection /> */}
+        <FeaturesSection />
         {/* <CtaSection /> */}
       </main>
       {/* <LandingFooter /> */}

@@ -4,7 +4,7 @@ import {
   useReducedMotion,
   type Variants,
 } from "framer-motion";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 
 const metrics = [
   {
@@ -30,7 +30,7 @@ const metrics = [
   },
 ];
 
-const reveal = {
+const reveal: Variants = {
   hidden: { opacity: 0, y: 18 },
   visible: {
     opacity: 1,
@@ -74,10 +74,15 @@ function AnimatedMetric({
   active: boolean;
   reduceMotion: boolean;
 }) {
-  const [displayValue, setDisplayValue] = useState("0");
+  const displayValueRef = useRef<HTMLSpanElement>(null);
 
   useEffect(() => {
-    if (!active) return;
+    const displayValue = displayValueRef.current;
+    if (!displayValue) return;
+    if (!active) {
+      displayValue.textContent = "0";
+      return;
+    }
 
     let animationFrame = 0;
     const duration = value === 0 || reduceMotion ? 0 : 1100;
@@ -87,8 +92,10 @@ function AnimatedMetric({
       const progress =
         duration === 0 ? 1 : Math.min((timestamp - startTime) / duration, 1);
       const easedProgress = 1 - (1 - progress) ** 3;
-      setDisplayValue(
-        formatMetricValue(value * easedProgress, decimals, suffix),
+      displayValue.textContent = formatMetricValue(
+        value * easedProgress,
+        decimals,
+        suffix,
       );
 
       if (progress < 1) {
@@ -100,7 +107,7 @@ function AnimatedMetric({
     return () => window.cancelAnimationFrame(animationFrame);
   }, [active, decimals, reduceMotion, suffix, value]);
 
-  return <span>{displayValue}</span>;
+  return <span ref={displayValueRef}>0</span>;
 }
 
 export default function PerformanceBenchmarks() {
@@ -109,11 +116,17 @@ export default function PerformanceBenchmarks() {
   const isInView = useInView(sectionRef, { amount: 0.25 });
 
   return (
-    <section className="performance-benchmarks" id="performance" ref={sectionRef}>
+    <section
+      className="performance-benchmarks"
+      id="performance"
+      ref={sectionRef}
+    >
       <motion.div
         className="performance-accent-line"
         initial={prefersReducedMotion ? false : { scaleX: 0, opacity: 0 }}
-        whileInView={prefersReducedMotion ? undefined : { scaleX: 1, opacity: 1 }}
+        whileInView={
+          prefersReducedMotion ? undefined : { scaleX: 1, opacity: 1 }
+        }
         viewport={{ once: true, amount: 0.35 }}
         transition={{ duration: 1.15, ease: [0.22, 1, 0.36, 1] }}
         aria-hidden="true"
@@ -163,8 +176,9 @@ export default function PerformanceBenchmarks() {
         </div>
 
         <motion.p className="performance-footnote" variants={reveal}>
-          Measured during a 5-minute <span>Grafana k6</span> stability test.
-          Peak throughput reached <span>7,420 req/s</span>.
+          Measured during a 5-minute <span>Grafana k6</span> stability test
+          across <span>1.55M+ requests</span>. Peak throughput reached{" "}
+          <span>7,420 req/s</span>.
         </motion.p>
       </motion.div>
 
@@ -333,7 +347,6 @@ export default function PerformanceBenchmarks() {
             font-size: clamp(32px, 10vw, 44px);
           }
         }
-
       `}</style>
     </section>
   );

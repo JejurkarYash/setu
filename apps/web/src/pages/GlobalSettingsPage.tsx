@@ -7,9 +7,6 @@ import {
   Key,
   Check,
   Save,
-  Lock,
-  Edit2,
-  X,
   Image as ImageIcon,
   Loader2,
 } from "lucide-react";
@@ -20,7 +17,7 @@ export default function GlobalSettingsPage() {
   const [name, setName] = useState("Yash Jejurkar");
   const [email, setEmail] = useState("yash@setu.dev");
   const [avatarUrl, setAvatarUrl] = useState("");
-  const [role, setRole] = useState("Workspace Owner");
+  const [role] = useState("Workspace Owner");
 
   // Edit mode & loading states
   const [isEditingProfile, setIsEditingProfile] = useState(false);
@@ -177,7 +174,6 @@ export default function GlobalSettingsPage() {
         onSubmit={handleSave}
         style={{ display: "flex", flexDirection: "column", gap: "28px" }}
       >
-        {/* ── Section 1: User Profile & Avatar Credentials ─────────────── */}
         <div
           style={{
             backgroundColor: "#121212",
@@ -222,48 +218,8 @@ export default function GlobalSettingsPage() {
                 USER PROFILE & AVATAR
               </h2>
             </div>
-
-            {/* <button
-              type="button"
-              disabled={isSubmitting}
-              onClick={() => {
-                if (isEditingProfile) {
-                  setName("Yash Jejurkar");
-                  setEmail("yash@setu.dev");
-                  setAvatarUrl("");
-                }
-                setIsEditingProfile(!isEditingProfile);
-              }}
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "6px",
-                padding: "6px 12px",
-                backgroundColor: isEditingProfile ? "#222222" : "#171717",
-                border: "1px solid #222222",
-                color: isEditingProfile ? "#34D399" : "#ffffff",
-                fontSize: "11px",
-                fontFamily: "'JetBrains Mono', monospace",
-                fontWeight: 600,
-                cursor: isSubmitting ? "not-allowed" : "pointer",
-                textTransform: "uppercase",
-              }}
-            >
-              {isEditingProfile ? (
-                <>
-                  <X size={13} color="#f87171" />
-                  <span>CANCEL</span>
-                </>
-              ) : (
-                <>
-                  <Edit2 size={13} color="#C084FC" />
-                  <span>EDIT PROFILE</span>
-                </>
-              )}
-            </button> */}
           </div>
 
-          {/* Avatar Preview Row */}
           <div style={{ display: "flex", alignItems: "center", gap: "20px" }}>
             <div
               style={{
@@ -328,7 +284,6 @@ export default function GlobalSettingsPage() {
               gap: "20px",
             }}
           >
-            {/* Full Name */}
             <div
               style={{ display: "flex", flexDirection: "column", gap: "10px" }}
             >
@@ -374,7 +329,6 @@ export default function GlobalSettingsPage() {
               />
             </div>
 
-            {/* Email Address */}
             <div
               style={{ display: "flex", flexDirection: "column", gap: "10px" }}
             >
@@ -419,108 +373,6 @@ export default function GlobalSettingsPage() {
                 }}
               />
             </div>
-
-            {/* Avatar URL (Only editable when unlocked) */}
-            <AnimatePresence>
-              {isEditingProfile && (
-                <motion.div
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: "auto" }}
-                  exit={{ opacity: 0, height: 0 }}
-                  style={{
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: "10px",
-                    gridColumn: "1 / -1",
-                    overflow: "hidden",
-                  }}
-                >
-                  <label
-                    style={{
-                      fontSize: "11px",
-                      fontFamily: "'JetBrains Mono', monospace",
-                      fontWeight: 700,
-                      color: "#71717a",
-                      textTransform: "uppercase",
-                      letterSpacing: "0.05em",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "6px",
-                    }}
-                  >
-                    <ImageIcon size={13} color="#8e8e8e" /> AVATAR URL
-                  </label>
-                  <input
-                    type="url"
-                    disabled={isSubmitting}
-                    value={avatarUrl}
-                    onChange={(e) => setAvatarUrl(e.target.value)}
-                    placeholder="https://example.com/avatar.jpg"
-                    style={{
-                      width: "100%",
-                      height: "44px",
-                      padding: "0 16px",
-                      backgroundColor: "#171717",
-                      border: "1px solid #34D399",
-                      color: "#ffffff",
-                      fontFamily: "'JetBrains Mono', monospace",
-                      fontSize: "12px",
-                      outline: "none",
-                      boxSizing: "border-box",
-                    }}
-                  />
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
-        </div>
-
-        {/* ── Section 2: Account Security & Role ────────────────────────── */}
-        <div
-          style={{
-            backgroundColor: "#121212",
-            border: "1px solid #222222",
-            padding: "28px",
-            display: "flex",
-            flexDirection: "column",
-            gap: "24px",
-            boxSizing: "border-box",
-          }}
-        >
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              paddingBottom: "16px",
-              borderBottom: "1px solid #1f1f1f",
-            }}
-          >
-            <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-              <span
-                style={{
-                  width: "8px",
-                  height: "8px",
-                  backgroundColor: "#34D399",
-                  borderRadius: "50%",
-                  display: "inline-block",
-                }}
-              />
-              <h2
-                style={{
-                  fontSize: "12px",
-                  fontFamily: "'JetBrains Mono', monospace",
-                  fontWeight: 700,
-                  color: "#ffffff",
-                  letterSpacing: "0.08em",
-                  margin: 0,
-                  textTransform: "uppercase",
-                }}
-              >
-                ACCESS & PRIVILEGES
-              </h2>
-            </div>
-            <Shield size={16} color="#71717a" />
           </div>
 
           <div
@@ -530,7 +382,6 @@ export default function GlobalSettingsPage() {
               gap: "20px",
             }}
           >
-            {/* Account Role */}
             <div
               style={{ display: "flex", flexDirection: "column", gap: "10px" }}
             >
@@ -547,11 +398,11 @@ export default function GlobalSettingsPage() {
                   gap: "6px",
                 }}
               >
-                <Key size={13} color="#8e8e8e" /> ACCESS ROLE
+                <Shield size={13} color="#8e8e8e" /> USER ROLE
               </label>
               <input
                 type="text"
-                disabled
+                readOnly
                 value={role}
                 style={{
                   width: "100%",
@@ -563,13 +414,11 @@ export default function GlobalSettingsPage() {
                   fontFamily: "'JetBrains Mono', monospace",
                   fontSize: "12px",
                   outline: "none",
-                  cursor: "not-allowed",
                   boxSizing: "border-box",
                 }}
               />
             </div>
 
-            {/* Gateway Key Status */}
             <div
               style={{ display: "flex", flexDirection: "column", gap: "10px" }}
             >
@@ -581,37 +430,79 @@ export default function GlobalSettingsPage() {
                   color: "#71717a",
                   textTransform: "uppercase",
                   letterSpacing: "0.05em",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "6px",
                 }}
               >
-                SECURITY ENCRYPTION
+                <Key size={13} color="#8e8e8e" /> API ACCESS
               </label>
-              <div
+              <input
+                type="text"
+                readOnly
+                value="Workspace-scoped"
                 style={{
+                  width: "100%",
                   height: "44px",
                   padding: "0 16px",
                   backgroundColor: "#0f0f0f",
                   border: "1px solid #1f1f1f",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  fontSize: "12px",
-                  fontFamily: "'JetBrains Mono', monospace",
                   color: "#8e8e8e",
+                  fontFamily: "'JetBrains Mono', monospace",
+                  fontSize: "12px",
+                  outline: "none",
                   boxSizing: "border-box",
                 }}
-              >
-                <span>AES-256-GCM Vault</span>
-                <span
-                  style={{
-                    color: "#34D399",
-                    fontSize: "11px",
-                    fontWeight: 600,
-                  }}
-                >
-                  ACTIVE
-                </span>
-              </div>
+              />
             </div>
+          </div>
+
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: "10px",
+            }}
+          >
+            <label
+              style={{
+                fontSize: "11px",
+                fontFamily: "'JetBrains Mono', monospace",
+                fontWeight: 700,
+                color: "#71717a",
+                textTransform: "uppercase",
+                letterSpacing: "0.05em",
+                display: "flex",
+                alignItems: "center",
+                gap: "6px",
+              }}
+            >
+              <ImageIcon size={13} color="#8e8e8e" /> AVATAR URL
+            </label>
+            <input
+              type="url"
+              readOnly={!isEditingProfile}
+              disabled={isSubmitting}
+              value={avatarUrl}
+              onChange={(e) => setAvatarUrl(e.target.value)}
+              placeholder="https://images.example.com/avatar.png"
+              style={{
+                width: "100%",
+                height: "44px",
+                padding: "0 16px",
+                backgroundColor: isEditingProfile ? "#171717" : "#0f0f0f",
+                border: isEditingProfile
+                  ? "1px solid #34D399"
+                  : "1px solid #1f1f1f",
+                color: isEditingProfile ? "#ffffff" : "#8e8e8e",
+                fontFamily: "'JetBrains Mono', monospace",
+                fontSize: "12px",
+                outline: "none",
+                cursor: isEditingProfile ? "text" : "not-allowed",
+                boxSizing: "border-box",
+                transition: "all 0.15s ease",
+              }}
+            />
           </div>
         </div>
       </form>

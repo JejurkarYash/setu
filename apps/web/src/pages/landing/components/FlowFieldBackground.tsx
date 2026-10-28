@@ -22,7 +22,22 @@ const palette = {
   teal: "#5EEAD4",
 };
 
-const primaryColors = [palette.orchid, palette.magenta, palette.violet, palette.orchid, palette.cyan];
+const primaryColors = [
+  palette.orchid,
+  palette.magenta,
+  palette.violet,
+  palette.orchid,
+  palette.cyan,
+];
+
+function cubic(t: number, p0: number, p1: number, p2: number, p3: number) {
+  return (
+    (1 - t) ** 3 * p0 +
+    3 * (1 - t) ** 2 * t * p1 +
+    3 * (1 - t) * t ** 2 * p2 +
+    t ** 3 * p3
+  );
+}
 
 export default function FlowFieldBackground() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -33,14 +48,19 @@ export default function FlowFieldBackground() {
     if (!canvas || !context) return;
 
     let animationFrame = 0;
+    let animationRunning = false;
     let width = 0;
     let height = 0;
     let reducedMotion = window.matchMedia(
       "(prefers-reduced-motion: reduce)",
     ).matches;
     let visible = !document.hidden;
+    let inViewport = true;
     const pointer = { x: 0.5, y: 0.5 };
     const strands: Strand[] = [];
+    let atmosphereGradient: CanvasGradient | null = null;
+    let routingHazeGradient: CanvasGradient | null = null;
+    let fadeGradient: CanvasGradient | null = null;
 
     const resize = () => {
       const bounds = canvas.getBoundingClientRect();
@@ -51,6 +71,22 @@ export default function FlowFieldBackground() {
       canvas.height = height * ratio;
       context.setTransform(ratio, 0, 0, ratio, 0, 0);
       strands.length = 0;
+      atmosphereGradient = null;
+      routingHazeGradient = context.createRadialGradient(
+        width * 0.53,
+        height * 0.31,
+        0,
+        width * 0.53,
+        height * 0.31,
+        Math.min(width, height) * 0.18,
+      );
+      routingHazeGradient.addColorStop(0, "rgba(232, 121, 249, 0.045)");
+      routingHazeGradient.addColorStop(0.35, "rgba(124, 58, 237, 0.018)");
+      routingHazeGradient.addColorStop(1, "rgba(8, 7, 11, 0)");
+      fadeGradient = context.createLinearGradient(0, height * 0.48, 0, height);
+      fadeGradient.addColorStop(0, "rgba(8, 7, 11, 0)");
+      fadeGradient.addColorStop(0.55, "rgba(8, 7, 11, 0.06)");
+      fadeGradient.addColorStop(1, "rgba(8, 7, 11, 0.65)");
 
       const primaryCount = width < 700 ? 3 : width < 1100 ? 4 : 5;
       const filamentCount = width < 700 ? 7 : width < 1100 ? 12 : 17;
@@ -110,7 +146,8 @@ export default function FlowFieldBackground() {
       const gatewayX = focalX + Math.cos(orbitAngle) * orbitRadiusX;
       const gatewayY = focalY + Math.sin(orbitAngle) * orbitRadiusY;
       const drift = Math.sin(phase * 1.2) * strand.amplitude;
-      const slowBend = Math.sin(time * 0.000045 + strand.phase) * height * 0.025;
+      const slowBend =
+        Math.sin(time * 0.000045 + strand.phase) * height * 0.025;
       const pointerDrift = (pointer.y - 0.5) * (strand.primary ? 8 : 3);
       const approachY = entryY + drift * 0.45 + pointerDrift;
       const departureY = exitY - drift * 0.35;
@@ -153,7 +190,10 @@ export default function FlowFieldBackground() {
       const pulseEnd = Math.min(1, pulse + (strand.primary ? 0.13 : 0.08));
       gradient.addColorStop(0, "rgba(0, 0, 0, 0)");
       gradient.addColorStop(pulseStart, strand.color);
-      gradient.addColorStop(pulse, `rgba(255,255,255,${strand.primary ? 0.9 : 0.55})`);
+      gradient.addColorStop(
+        pulse,
+        `rgba(255,255,255,${strand.primary ? 0.9 : 0.55})`,
+      );
       gradient.addColorStop(pulseEnd, strand.color);
       gradient.addColorStop(1, "rgba(0, 0, 0, 0)");
 
@@ -173,20 +213,11 @@ export default function FlowFieldBackground() {
 
       if (strand.pulse) {
         const pulsePosition =
-          (time * strand.speed * 1.6 + strand.phase * 0.17 + strand.pulseOffset) % 1;
+          (time * strand.speed * 1.6 +
+            strand.phase * 0.17 +
+            strand.pulseOffset) %
+          1;
         const pointAt = (progress: number) => {
-          const cubic = (
-            t: number,
-            p0: number,
-            p1: number,
-            p2: number,
-            p3: number,
-          ) =>
-            (1 - t) ** 3 * p0 +
-            3 * (1 - t) ** 2 * t * p1 +
-            3 * (1 - t) * t ** 2 * p2 +
-            t ** 3 * p3;
-
           if (progress < 0.5) {
             const t = progress * 2;
             return {
@@ -216,8 +247,14 @@ export default function FlowFieldBackground() {
 
         const head = pointAt(pulsePosition);
         const tail = pointAt(Math.max(0, pulsePosition - 0.028));
-        const pulseColor = strand.color === palette.cyan ? palette.cyan : palette.orchid;
-        const tailGradient = context.createLinearGradient(tail.x, tail.y, head.x, head.y);
+        const pulseColor =
+          strand.color === palette.cyan ? palette.cyan : palette.orchid;
+        const tailGradient = context.createLinearGradient(
+          tail.x,
+          tail.y,
+          head.x,
+          head.y,
+        );
         tailGradient.addColorStop(0, "rgba(255,255,255,0)");
         tailGradient.addColorStop(1, `${pulseColor}99`);
         context.globalAlpha = strand.primary ? 0.38 : 0.2;
@@ -250,88 +287,135 @@ export default function FlowFieldBackground() {
         context.globalAlpha = strand.primary ? 0.75 : 0.52;
         context.fillStyle = pulseColor;
         context.beginPath();
-        context.arc(head.x, head.y, strand.primary ? 1.35 : 0.9, 0, Math.PI * 2);
+        context.arc(
+          head.x,
+          head.y,
+          strand.primary ? 1.35 : 0.9,
+          0,
+          Math.PI * 2,
+        );
         context.fill();
       }
     };
 
     const draw = (timestamp: number) => {
-      if (!visible) return;
+      animationFrame = 0;
+      if (!visible || !inViewport) {
+        animationRunning = false;
+        return;
+      }
       const time = reducedMotion ? 0 : timestamp;
       context.clearRect(0, 0, width, height);
 
-      const atmosphere = context.createRadialGradient(
-        width * (0.52 + (pointer.x - 0.5) * 0.025),
-        height * 0.25,
-        0,
-        width * 0.52,
-        height * 0.25,
-        width * 0.58,
-      );
-      atmosphere.addColorStop(0, "rgba(124, 58, 237, 0.009)");
-      atmosphere.addColorStop(0.48, "rgba(232, 121, 249, 0.003)");
-      atmosphere.addColorStop(1, "rgba(8, 7, 11, 0)");
-      context.fillStyle = atmosphere;
+      if (!atmosphereGradient) {
+        atmosphereGradient = context.createRadialGradient(
+          width * (0.52 + (pointer.x - 0.5) * 0.025),
+          height * 0.25,
+          0,
+          width * 0.52,
+          height * 0.25,
+          width * 0.58,
+        );
+        atmosphereGradient.addColorStop(0, "rgba(124, 58, 237, 0.009)");
+        atmosphereGradient.addColorStop(0.48, "rgba(232, 121, 249, 0.003)");
+        atmosphereGradient.addColorStop(1, "rgba(8, 7, 11, 0)");
+      }
+      if (atmosphereGradient) {
+        context.fillStyle = atmosphereGradient;
+      }
       context.fillRect(0, 0, width, height);
 
       context.globalCompositeOperation = "lighter";
       strands.forEach((strand, index) => drawStrand(strand, index, time));
 
-      const routingHaze = context.createRadialGradient(
-        width * 0.53,
-        height * 0.31,
-        0,
-        width * 0.53,
-        height * 0.31,
-        Math.min(width, height) * 0.18,
-      );
-      routingHaze.addColorStop(0, "rgba(232, 121, 249, 0.045)");
-      routingHaze.addColorStop(0.35, "rgba(124, 58, 237, 0.018)");
-      routingHaze.addColorStop(1, "rgba(8, 7, 11, 0)");
       context.globalAlpha = 1;
-      context.fillStyle = routingHaze;
+      if (routingHazeGradient) {
+        context.fillStyle = routingHazeGradient;
+      }
       context.fillRect(0, 0, width, height);
 
       context.globalAlpha = 1;
       context.globalCompositeOperation = "source-over";
-      const fade = context.createLinearGradient(0, height * 0.48, 0, height);
-      fade.addColorStop(0, "rgba(8, 7, 11, 0)");
-      fade.addColorStop(0.55, "rgba(8, 7, 11, 0.06)");
-      fade.addColorStop(1, "rgba(8, 7, 11, 0.65)");
-      context.fillStyle = fade;
+      if (fadeGradient) {
+        context.fillStyle = fadeGradient;
+      }
       context.fillRect(0, height * 0.42, width, height * 0.58);
 
+      if (!reducedMotion) {
+        animationFrame = window.requestAnimationFrame(draw);
+      } else {
+        animationRunning = false;
+      }
+    };
+
+    const scheduleDraw = () => {
+      if (animationRunning || reducedMotion || !visible || !inViewport) {
+        return;
+      }
+
+      animationRunning = true;
       animationFrame = window.requestAnimationFrame(draw);
     };
 
     const handleVisibility = () => {
       visible = !document.hidden;
-      if (visible) animationFrame = window.requestAnimationFrame(draw);
+      if (!visible && animationFrame) {
+        window.cancelAnimationFrame(animationFrame);
+        animationFrame = 0;
+        animationRunning = false;
+      }
+      scheduleDraw();
     };
     const handlePointer = (event: PointerEvent) => {
-      pointer.x = event.clientX / window.innerWidth;
-      pointer.y = event.clientY / window.innerHeight;
+      const nextX = event.clientX / window.innerWidth;
+      const nextY = event.clientY / window.innerHeight;
+      if (nextX === pointer.x && nextY === pointer.y) return;
+      pointer.x = nextX;
+      pointer.y = nextY;
+      atmosphereGradient = null;
     };
     const motionQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
     const handleMotionPreference = (event: MediaQueryListEvent) => {
       reducedMotion = event.matches;
+      if (reducedMotion && animationFrame) {
+        window.cancelAnimationFrame(animationFrame);
+        animationFrame = 0;
+        animationRunning = false;
+      }
+      scheduleDraw();
     };
+    const viewportObserver = new IntersectionObserver(
+      ([entry]) => {
+        inViewport = entry.isIntersecting;
+        if (!inViewport && animationFrame) {
+          window.cancelAnimationFrame(animationFrame);
+          animationFrame = 0;
+          animationRunning = false;
+        }
+        scheduleDraw();
+      },
+      { rootMargin: "120px 0px" },
+    );
 
     resize();
+    viewportObserver.observe(canvas);
     window.addEventListener("resize", resize);
     window.addEventListener("pointermove", handlePointer, { passive: true });
     document.addEventListener("visibilitychange", handleVisibility);
     motionQuery.addEventListener("change", handleMotionPreference);
-    animationFrame = window.requestAnimationFrame(draw);
+    draw(performance.now());
 
     return () => {
-      window.cancelAnimationFrame(animationFrame);
+      if (animationFrame) window.cancelAnimationFrame(animationFrame);
       window.removeEventListener("resize", resize);
       window.removeEventListener("pointermove", handlePointer);
       document.removeEventListener("visibilitychange", handleVisibility);
       motionQuery.removeEventListener("change", handleMotionPreference);
+      viewportObserver.disconnect();
     };
   }, []);
 
-  return <canvas ref={canvasRef} className="landing-flow-field" aria-hidden="true" />;
+  return (
+    <canvas ref={canvasRef} className="landing-flow-field" aria-hidden="true" />
+  );
 }
