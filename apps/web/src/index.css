@@ -1,5 +1,5 @@
-/* Geist + Jetbrains Mono */ 
-@import url('[https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap](https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap)');
+/* Geist + Jetbrains Mono */
+@import url("https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap");
 
 @import "tailwindcss";
 
@@ -43,6 +43,7 @@
 
 html {
   font-family: 'Geist', sans-serif; 
+  scroll-behavior: smooth;
 }
 
 body {

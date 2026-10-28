@@ -2,8 +2,10 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { ProjectProvider } from "./context/ProjectContext";
 import { UserProvider } from "./context/UserContext";
 import AppLayout from "./layouts/AppLayout";
+import LandingLayout from "./layouts/LandingLayout";
 import DashboardPage from "./pages/DashboardPage";
 import GlobalSettingsPage from "./pages/GlobalSettingsPage";
+import LandingPage from "./pages/landing/LandingPage";
 import ProjectOverviewPage from "./pages/project/ProjectOverviewPage";
 import ProjectKeysPage from "./pages/project/ProjectKeysPage";
 import ProjectLogsPage from "./pages/project/ProjectLogsPage";
@@ -16,7 +18,9 @@ export default function App() {
       <UserProvider>
         <ProjectProvider>
           <Routes>
-          <Route path="/" element={<Navigate to="/dashboard" replace />} />
+          <Route element={<LandingLayout />}>
+            <Route path="/" element={<LandingPage />} />
+          </Route>
 
           <Route element={<AppLayout />}>
             {/* Global Workspace Routes */}
