@@ -14,44 +14,19 @@ const metrics = [
     unit: "req/s",
     label: "SUSTAINED THROUGHPUT",
   },
-  {
-    value: 2.88,
-    decimals: 2,
-    suffix: "",
-    unit: "ms",
-    label: "P95 LATENCY",
-  },
-  {
-    value: 0,
-    decimals: 0,
-    suffix: "%",
-    unit: "",
-    label: "HTTP FAILURES",
-  },
+  { value: 2.88, decimals: 2, suffix: "", unit: "ms", label: "P95 LATENCY" },
+  { value: 0, decimals: 0, suffix: "%", unit: "", label: "HTTP FAILURES" },
 ];
 
-const reveal: Variants = {
-  hidden: { opacity: 0, y: 18 },
-  visible: {
-    opacity: 1,
-    y: 0,
-    transition: { duration: 0.6, ease: [0.22, 1, 0.36, 1] },
-  },
-};
+const ease = [0.16, 1, 0.3, 1] as const;
 
-const metricReveal: Variants = {
-  hidden: { opacity: 0, y: 22, scale: 0.98 },
-  visible: {
-    opacity: 1,
-    y: 0,
-    scale: 1,
-    transition: {
-      type: "spring",
-      stiffness: 72,
-      damping: 18,
-      mass: 0.8,
-    },
-  },
+// One signal crosses the ledger. Each figure resolves as it passes.
+const PASS_MS = 1500;
+const STEP_MS = PASS_MS / metrics.length;
+
+const reveal: Variants = {
+  hidden: { opacity: 0, y: 16 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.8, ease } },
 };
 
 function formatMetricValue(value: number, decimals: number, suffix: string) {
@@ -66,76 +41,68 @@ function AnimatedMetric({
   decimals,
   suffix,
   active,
+  delay,
   reduceMotion,
 }: {
   value: number;
   decimals: number;
   suffix: string;
   active: boolean;
+  delay: number;
   reduceMotion: boolean;
 }) {
-  const displayValueRef = useRef<HTMLSpanElement>(null);
+  const ref = useRef<HTMLSpanElement>(null);
 
   useEffect(() => {
-    const displayValue = displayValueRef.current;
-    if (!displayValue) return;
-    if (!active) {
-      displayValue.textContent = "0";
-      return;
-    }
+    const node = ref.current;
+    if (!node || !active || reduceMotion || value === 0) return;
 
-    let animationFrame = 0;
-    const duration = value === 0 || reduceMotion ? 0 : 1100;
-    const startTime = performance.now();
+    node.textContent = formatMetricValue(0, decimals, suffix);
+    const duration = 1300;
+    let frame = 0;
+    let start = 0;
 
-    const animate = (timestamp: number) => {
-      const progress =
-        duration === 0 ? 1 : Math.min((timestamp - startTime) / duration, 1);
-      const easedProgress = 1 - (1 - progress) ** 3;
-      displayValue.textContent = formatMetricValue(
-        value * easedProgress,
-        decimals,
-        suffix,
-      );
-
-      if (progress < 1) {
-        animationFrame = window.requestAnimationFrame(animate);
-      }
+    // Runs only while counting, then stops itself.
+    const tick = (now: number) => {
+      if (!start) start = now;
+      const t = Math.min((now - start) / duration, 1);
+      const eased = 1 - (1 - t) ** 4;
+      node.textContent = formatMetricValue(value * eased, decimals, suffix);
+      if (t < 1) frame = requestAnimationFrame(tick);
     };
 
-    animationFrame = window.requestAnimationFrame(animate);
-    return () => window.cancelAnimationFrame(animationFrame);
-  }, [active, decimals, reduceMotion, suffix, value]);
+    const timer = window.setTimeout(() => {
+      frame = requestAnimationFrame(tick);
+    }, delay);
 
-  return <span ref={displayValueRef}>0</span>;
+    return () => {
+      window.clearTimeout(timer);
+      cancelAnimationFrame(frame);
+    };
+  }, [active, decimals, delay, reduceMotion, suffix, value]);
+
+  // Final value is the server/first render, so there is no layout shift.
+  return <span ref={ref}>{formatMetricValue(value, decimals, suffix)}</span>;
 }
 
 export default function PerformanceBenchmarks() {
-  const prefersReducedMotion = useReducedMotion();
+  const reduceMotion = Boolean(useReducedMotion());
   const sectionRef = useRef<HTMLElement>(null);
-  const isInView = useInView(sectionRef, { amount: 0.25 });
+  const ledgerRef = useRef<HTMLDivElement>(null);
+  const ledgerInView = useInView(ledgerRef, { amount: 0.4, once: true });
 
   return (
     <section
       className="performance-benchmarks"
       id="performance"
+      data-chapter="01 / PERFORMANCE"
       ref={sectionRef}
     >
       <motion.div
-        className="performance-accent-line"
-        initial={prefersReducedMotion ? false : { scaleX: 0, opacity: 0 }}
-        whileInView={
-          prefersReducedMotion ? undefined : { scaleX: 1, opacity: 1 }
-        }
-        viewport={{ once: true, amount: 0.35 }}
-        transition={{ duration: 1.15, ease: [0.22, 1, 0.36, 1] }}
-        aria-hidden="true"
-      />
-      <motion.div
-        className="performance-benchmarks-inner"
-        initial={prefersReducedMotion ? false : "hidden"}
-        whileInView={prefersReducedMotion ? undefined : "visible"}
-        viewport={{ amount: 0.25 }}
+        className="performance-inner"
+        initial={reduceMotion ? false : "hidden"}
+        whileInView={reduceMotion ? undefined : "visible"}
+        viewport={{ once: true, amount: 0.2 }}
         variants={{
           hidden: {},
           visible: { transition: { staggerChildren: 0.1 } },
@@ -151,27 +118,34 @@ export default function PerformanceBenchmarks() {
         </motion.div>
 
         <div
-          className="performance-metrics"
+          ref={ledgerRef}
+          className={`performance-ledger${ledgerInView || reduceMotion ? " is-live" : ""}`}
           aria-label="Performance benchmarks"
         >
-          {metrics.map((metric) => (
-            <motion.div
+          {/* the route continues here from the hero: port, then one signal */}
+          <span className="ledger-port" aria-hidden="true" />
+          <span className="ledger-route" aria-hidden="true" />
+          <span className="ledger-signal" aria-hidden="true" />
+
+          {metrics.map((metric, i) => (
+            <div
               className="performance-metric"
               key={metric.label}
-              variants={metricReveal}
+              style={{ ["--d" as string]: `${i * STEP_MS}ms` }}
             >
               <div className="performance-value">
                 <AnimatedMetric
                   value={metric.value}
                   decimals={metric.decimals}
                   suffix={metric.suffix}
-                  active={isInView}
-                  reduceMotion={Boolean(prefersReducedMotion)}
+                  active={ledgerInView}
+                  delay={i * STEP_MS}
+                  reduceMotion={reduceMotion}
                 />
                 {metric.unit && <small>{metric.unit}</small>}
               </div>
               <p>{metric.label}</p>
-            </motion.div>
+            </div>
           ))}
         </div>
 
@@ -193,41 +167,17 @@ export default function PerformanceBenchmarks() {
           font-family: "Geist", sans-serif;
         }
 
-        .performance-benchmarks::before {
-          display: none;
-        }
-
-        .performance-accent-line {
-          position: absolute;
-          top: -1px;
-          left: 0;
-          width: 100%;
-          height: 1px;
-          content: "";
-          background: linear-gradient(
-            90deg,
-            transparent,
-            rgba(232, 121, 249, 0.5) 42%,
-            rgba(103, 232, 249, 0.25) 58%,
-            transparent
-          );
-          opacity: 0.72;
-          transform-origin: center;
-        }
-
-        .performance-benchmarks-inner {
+        .performance-inner {
           max-width: 1180px;
           margin: 0 auto;
-          padding: clamp(86px, 10vw, 136px) clamp(22px, 6vw, 96px) 72px;
+          padding: clamp(80px, 10vw, 128px) clamp(22px, 6vw, 96px) 72px;
         }
 
-        .performance-intro {
-          max-width: 680px;
-        }
+        .performance-intro { max-width: 680px; }
 
         .performance-eyebrow {
           margin: 0 0 18px;
-          color: #d98be9;
+          color: #8f8f97;
           font-family: "JetBrains Mono", monospace;
           font-size: 11px;
           letter-spacing: 0.16em;
@@ -237,35 +187,82 @@ export default function PerformanceBenchmarks() {
           margin: 0;
           color: #f7f7f7;
           font-size: clamp(32px, 4vw, 52px);
-          font-weight: 700;
-          letter-spacing: -0.05em;
+          font-weight: 600;
+          letter-spacing: -0.06em;
           line-height: 1.04;
         }
 
         .performance-description {
           max-width: 520px;
           margin: 20px 0 0;
-          color: #8e8e98;
+          color: #969ba3;
           font-size: 14px;
-          line-height: 1.55;
+          line-height: 1.6;
         }
 
-        .performance-metrics {
+        .performance-ledger {
+          position: relative;
           display: grid;
           grid-template-columns: repeat(3, 1fr);
           margin-top: 72px;
-          border-top: 1px solid #202026;
           border-bottom: 1px solid #202026;
         }
 
-        .performance-metric {
-          min-width: 0;
-          padding: 34px clamp(18px, 3.4vw, 48px) 38px;
+        /* the ledger's top edge: a graphite rail with a cyan route drawn over it */
+        .performance-ledger::before {
+          position: absolute;
+          top: 0;
+          right: 0;
+          left: 0;
+          height: 1px;
+          content: "";
+          background: #202026;
         }
 
-        .performance-metric + .performance-metric {
-          border-left: 1px solid #202026;
+        .ledger-route {
+          position: absolute;
+          top: 0;
+          right: 0;
+          left: 0;
+          height: 1px;
+          background: linear-gradient(90deg, #67e8f9, rgba(103, 232, 249, 0.25));
+          transform: scaleX(0);
+          transform-origin: left;
         }
+
+        /* the orchid port where the route enters the ledger */
+        .ledger-port {
+          position: absolute;
+          top: -9px;
+          left: 0;
+          width: 2px;
+          height: 18px;
+          background: #e879f9;
+          opacity: 0;
+        }
+
+        .ledger-signal {
+          position: absolute;
+          top: -1px;
+          left: 0;
+          width: 36px;
+          height: 3px;
+          border-radius: 2px;
+          background: #a5f3fc;
+          opacity: 0;
+        }
+
+        .performance-metric {
+          position: relative;
+          min-width: 0;
+          padding: 34px clamp(18px, 3.4vw, 48px) 38px;
+          opacity: 0;
+          transform: translateY(14px);
+          transition: background 300ms ease;
+        }
+
+        .performance-metric:hover { background: #08080b; }
+        .performance-metric + .performance-metric { border-left: 1px solid #202026; }
 
         .performance-value {
           display: flex;
@@ -281,13 +278,13 @@ export default function PerformanceBenchmarks() {
           font-weight: 700;
           letter-spacing: -0.055em;
           line-height: 1;
+          font-variant-numeric: tabular-nums;
         }
 
         .performance-value small {
-          color: #e879f9;
+          color: #67e8f9;
           font-family: "JetBrains Mono", monospace;
           font-size: 12px;
-          letter-spacing: 0.02em;
         }
 
         .performance-metric p {
@@ -301,9 +298,7 @@ export default function PerformanceBenchmarks() {
         .performance-footnote {
           margin: 0;
           padding-top: 18px;
-          border-top: 1px solid #202026;
           color: #686873;
-          font-family: "Geist", sans-serif;
           font-size: 12px;
           line-height: 1.5;
         }
@@ -314,38 +309,53 @@ export default function PerformanceBenchmarks() {
           font-size: 11px;
         }
 
+        /* ---- one orchestrated pass, triggered once ---- */
+        .performance-ledger.is-live .ledger-route {
+          animation: ledger-draw ${PASS_MS}ms cubic-bezier(0.45, 0, 0.2, 1) forwards;
+        }
+
+        .performance-ledger.is-live .ledger-port { animation: ledger-fade 500ms ease forwards; }
+
+        .performance-ledger.is-live .ledger-signal {
+          animation: ledger-pass ${PASS_MS}ms cubic-bezier(0.45, 0, 0.2, 1) forwards;
+        }
+
+        .performance-ledger.is-live .performance-metric {
+          animation: ledger-metric 900ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+          animation-delay: var(--d);
+        }
+
+        @keyframes ledger-draw { to { transform: scaleX(1); } }
+        @keyframes ledger-fade { to { opacity: 1; } }
+        @keyframes ledger-pass {
+          0% { left: 0; opacity: 1; }
+          92% { opacity: 1; }
+          100% { left: calc(100% - 36px); opacity: 0; }
+        }
+        @keyframes ledger-metric { to { opacity: 1; transform: translateY(0); } }
+
         @media (max-width: 700px) {
-          .performance-benchmarks {
-            margin-left: 0;
-            margin-right: 0;
-          }
+          .performance-benchmarks { margin-left: 0; margin-right: 0; border-left: 0; }
+          .performance-inner { padding: 72px 20px 52px; }
+          .performance-intro h2 { font-size: clamp(32px, 10vw, 44px); }
 
-          .performance-benchmarks-inner {
-            padding: 72px 20px 52px;
-          }
+          .performance-ledger { grid-template-columns: repeat(2, 1fr); margin-top: 52px; }
+          .performance-metric { padding: 26px 16px 30px; }
 
-          .performance-intro h2 {
-            font-size: clamp(32px, 10vw, 44px);
-          }
-
-          .performance-metrics {
-            grid-template-columns: repeat(2, 1fr);
-            margin-top: 52px;
-          }
-
-          .performance-metric {
-            padding: 26px 16px 30px;
-          }
-
-          .performance-metric:nth-child(3) {
+          .performance-metric:nth-of-type(3) {
             grid-column: 1 / -1;
             border-top: 1px solid #202026;
             border-left: 0;
           }
 
-          .performance-value span {
-            font-size: clamp(32px, 10vw, 44px);
-          }
+          .performance-value span { font-size: clamp(32px, 10vw, 44px); }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+          .performance-metric { opacity: 1; transform: none; }
+          .ledger-route { transform: scaleX(1); }
+          .ledger-port { opacity: 1; }
+          .performance-ledger.is-live * { animation: none !important; }
         }
       `}</style>
     </section>

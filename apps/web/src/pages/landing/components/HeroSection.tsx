@@ -1,564 +1,481 @@
-import { useEffect, useRef, useState } from "react";
-import {
-  motion,
-  useScroll,
-  useTransform,
-  type Variants,
-} from "framer-motion";
+import { useEffect, useRef, type CSSProperties } from "react";
+import { motion, useReducedMotion, type Variants } from "framer-motion";
 import { Link } from "react-router-dom";
-import FlowFieldBackground from "./FlowFieldBackground";
-import ScrambleText from "./ScrambleText";
 
-const heroCopyVariants: Variants = {
-  hidden: { opacity: 0, y: 20 },
-  visible: {
-    opacity: 1,
-    y: 0,
-    transition: {
-      delayChildren: 0.1,
-      staggerChildren: 0.08,
-      duration: 0.7,
-      ease: [0.16, 1, 0.3, 1],
-    },
-  },
+/* ------------------------------------------------------------------
+   "The Span"
+   Many application lines are drawn together into one heavy beam (the
+   gateway), then released to a small set of providers. One request is
+   routed across in cyan. The only orchid mark is the gateway's port.
+------------------------------------------------------------------- */
+const W = 1440;
+const H = 520;
+const NECK_X = 600;
+const MID = H / 2;
+
+const LEFT_COUNT = 19;
+const RIGHT_COUNT = 6;
+const ACCENT_LEFT = 6;
+const ACCENT_RIGHT = 2;
+
+const neckY = (i: number, n: number) => MID + (i - (n - 1) / 2) * 1.5;
+
+const leftPath = (i: number) => {
+  const y = 16 + i * ((H - 32) / (LEFT_COUNT - 1));
+  const ny = neckY(i, LEFT_COUNT);
+  return `M0 ${y} C 300 ${y} 340 ${ny} ${NECK_X} ${ny}`;
 };
 
-const heroItemVariants: Variants = {
-  hidden: { opacity: 0, y: 12 },
-  visible: { opacity: 1, y: 0 },
+const rightPath = (k: number) => {
+  const y = 70 + k * ((H - 140) / (RIGHT_COUNT - 1));
+  const ny = neckY(k, RIGHT_COUNT);
+  return `M${NECK_X} ${ny} C 880 ${ny} 920 ${y} 1160 ${y} L${W} ${y}`;
 };
+
+const routePath = `${leftPath(ACCENT_LEFT)} ${rightPath(ACCENT_RIGHT).replace(/^M\S+ \S+/, "")}`;
+
+const ease = [0.16, 1, 0.3, 1] as const;
+
+const stagger: Variants = {
+  hidden: {},
+  visible: { transition: { staggerChildren: 0.1, delayChildren: 0.08 } },
+};
+
+const lineUp: Variants = {
+  hidden: { y: "108%" },
+  visible: { y: 0, transition: { duration: 0.95, ease } },
+};
+
+const fadeUp: Variants = {
+  hidden: { opacity: 0, y: 14 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.8, ease } },
+};
+
+const hoverSpring = { type: "spring" as const, stiffness: 400, damping: 20 };
+
+function Span() {
+  return (
+    <svg
+      className="setu-span"
+      viewBox={`0 0 ${W} ${H}`}
+      preserveAspectRatio="none"
+      role="img"
+      aria-label="Many application request lines drawn together into a single gateway, then routed out to a few model providers"
+    >
+      <defs>
+        <linearGradient
+          id="span-in"
+          gradientUnits="userSpaceOnUse"
+          x1="0"
+          x2={NECK_X}
+          y1="0"
+          y2="0"
+        >
+          <stop offset="0" stopColor="#30363D" stopOpacity="0" />
+          <stop offset="0.55" stopColor="#3A4247" />
+          <stop offset="1" stopColor="#565D66" />
+        </linearGradient>
+        <linearGradient
+          id="span-out"
+          gradientUnits="userSpaceOnUse"
+          x1={NECK_X}
+          x2={W}
+          y1="0"
+          y2="0"
+        >
+          <stop offset="0" stopColor="#565D66" />
+          <stop offset="0.5" stopColor="#3A4247" />
+          <stop offset="1" stopColor="#30363D" />
+        </linearGradient>
+      </defs>
+
+      <g className="span-lines">
+        {Array.from({ length: LEFT_COUNT }, (_, i) =>
+          i === ACCENT_LEFT ? null : (
+            <path
+              key={`l${i}`}
+              d={leftPath(i)}
+              pathLength={1}
+              stroke="url(#span-in)"
+              style={{ "--i": i } as CSSProperties}
+            />
+          ),
+        )}
+        {Array.from({ length: RIGHT_COUNT }, (_, k) =>
+          k === ACCENT_RIGHT ? null : (
+            <path
+              key={`r${k}`}
+              d={rightPath(k)}
+              pathLength={1}
+              stroke="url(#span-out)"
+              style={{ "--i": k + 10 } as CSSProperties}
+            />
+          ),
+        )}
+      </g>
+
+      {/* the gateway: one heavy beam */}
+      <line
+        className="span-beam"
+        x1={NECK_X - 70}
+        x2={NECK_X + 70}
+        y1={MID}
+        y2={MID}
+      />
+
+      {/* the routed request */}
+      <path className="span-route" d={routePath} pathLength={100} />
+      <path className="span-pulse" d={routePath} pathLength={100} />
+    </svg>
+  );
+}
 
 export default function HeroSection() {
-  const containerRef = useRef<HTMLDivElement | null>(null);
-  const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
-  const [isHovered, setIsHovered] = useState(false);
+  const heroRef = useRef<HTMLElement | null>(null);
+  const reduceMotion = useReducedMotion();
 
-  // Scroll parallax effect for multi-layered depth
-  const { scrollY } = useScroll();
-  const heroY = useTransform(scrollY, [0, 500], [0, 120]);
-  const heroOpacity = useTransform(scrollY, [0, 400], [1, 0.2]);
-
-  // High-performance RAF throttled mouse parallax tracking
+  // Pause CSS animation while off screen. Toggles a class, no React state.
   useEffect(() => {
-    let animationFrameId: number;
-    let currentX = 0;
-    let currentY = 0;
-    let targetX = 0;
-    let targetY = 0;
-
-    const handleMouseMove = (e: MouseEvent) => {
-      const { innerWidth, innerHeight } = window;
-      targetX = (e.clientX / innerWidth - 0.5) * 14;
-      targetY = (e.clientY / innerHeight - 0.5) * 14;
-    };
-
-    const render = () => {
-      currentX += (targetX - currentX) * 0.1;
-      currentY += (targetY - currentY) * 0.1;
-      setMousePosition({ x: currentX, y: currentY });
-      animationFrameId = requestAnimationFrame(render);
-    };
-
-    window.addEventListener("mousemove", handleMouseMove, { passive: true });
-    animationFrameId = requestAnimationFrame(render);
-
-    return () => {
-      window.removeEventListener("mousemove", handleMouseMove);
-      cancelAnimationFrame(animationFrameId);
-    };
+    const hero = heroRef.current;
+    if (!hero || typeof IntersectionObserver === "undefined") return;
+    const observer = new IntersectionObserver(
+      ([entry]) => hero.classList.toggle("is-paused", !entry.isIntersecting),
+      { threshold: 0.02 },
+    );
+    observer.observe(hero);
+    return () => observer.disconnect();
   }, []);
 
   return (
-    <motion.section
-      className="landing-hero"
-      ref={containerRef}
-      style={{ y: heroY, opacity: heroOpacity }}
-    >
-      <FlowFieldBackground />
-
-      {/* Dynamic Interactive Spotlight Glow tracking cursor */}
-      <div
-        className="landing-cursor-spotlight"
-        style={{
-          transform: `translate3d(${mousePosition.x * 25}px, ${mousePosition.y * 25}px, 0px)`,
-        }}
-        aria-hidden="true"
-      />
-
-      {/* Cinematic Ambient Energy Core Glow */}
-      <div className="landing-ambient-core" aria-hidden="true" />
-      <div className="landing-ambient-core-secondary" aria-hidden="true" />
-
+    <section className="setu-hero" ref={heroRef}>
       <motion.div
-        className="landing-hero-content"
-        initial="hidden"
+        className="setu-top"
+        initial={reduceMotion ? false : "hidden"}
         animate="visible"
-        variants={heroCopyVariants}
-        style={{
-          transform: `translate3d(${-mousePosition.x}px, ${-mousePosition.y}px, 0px)`,
-        }}
+        variants={stagger}
       >
-        <motion.div className="landing-hero-copy" variants={heroItemVariants}>
-          {/* <motion.div
-            className="landing-badge-wrapper"
-            variants={heroItemVariants}
-            whileHover={{ scale: 1.03 }}
-          >
-            <span className="badge-pulse-dot" />
-            <span className="badge-text">
-              GO-POWERED LLM GATEWAY & BUDGET SHIELD
-            </span>
-            <div className="badge-shimmer" />
-          </motion.div> */}
-
-          <motion.h1 variants={heroItemVariants}>
-            <ScrambleText text="Never Get Surprised by" delay={200} />
-            <br />
-            <span className="landing-hero-accent-wrapper">
-              <ScrambleText
-                text="a Spiked LLM Bill Again."
-                className="landing-hero-accent"
-                delay={500}
-              />
-              <span className="accent-underline-glow" />
-            </span>
-          </motion.h1>
-
-          <motion.p variants={heroItemVariants}>
-            Setu sits between your application and providers to automatically
-            block over-cap requests,
-            <br className="landing-desktop-break" /> manage API keys, and track
-            spend per project in real time with absolute cryptographic
-            precision.
+        <div className="setu-headline">
+          <motion.p className="setu-eyebrow" variants={fadeUp}>
+            SETU / LLM GATEWAY
           </motion.p>
-        </motion.div>
+          <h1 className="setu-title">
+            <span className="setu-line">
+              <motion.span variants={lineUp}>One gateway.</motion.span>
+            </span>
+            <span className="setu-line">
+              <motion.span variants={lineUp}>Every model.</motion.span>
+            </span>
+            <span className="setu-line">
+              <motion.span variants={lineUp}>Total control.</motion.span>
+            </span>
+          </h1>
+        </div>
 
-        <motion.div
-          className="landing-hero-actions"
-          variants={heroItemVariants}
-        >
-          <motion.div
-            whileHover={{ y: -4, scale: 1.02 }}
-            whileTap={{ scale: 0.97 }}
-            transition={{ type: "spring", stiffness: 400, damping: 20 }}
-          >
-            <Link to="/dashboard" className="landing-primary-action">
-              <span>Get Started</span>
-              <svg
-                className="action-arrow-icon"
-                viewBox="0 0 16 16"
-                fill="none"
-                aria-hidden="true"
-              >
-                <path
-                  d="M3.333 8h9.334M8 3.333L12.667 8 8 12.667"
-                  stroke="currentColor"
-                  strokeWidth="1.75"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
-            </Link>
-          </motion.div>
-
-          <motion.div
-            whileHover={{ y: -4, scale: 1.02 }}
-            whileTap={{ scale: 0.97 }}
-            transition={{ type: "spring", stiffness: 400, damping: 20 }}
-            onHoverStart={() => setIsHovered(true)}
-            onHoverEnd={() => setIsHovered(false)}
-          >
-            <a
-              href="https://github.com/JejurkarYash/setu"
-              target="_blank"
-              rel="noreferrer"
-              className="landing-secondary-action hover:cursor-pointer"
+        <motion.div className="setu-aside" variants={fadeUp}>
+          <p>
+            Route requests, monitor usage, and control LLM spending through one
+            unified gateway.
+          </p>
+          <div className="setu-actions">
+            <motion.div
+              whileHover={{ y: -4, scale: 1.02 }}
+              whileTap={{ scale: 0.97 }}
+              transition={hoverSpring}
             >
-              <svg
-                className="landing-github-icon"
-                viewBox="0 0 24 24"
-                aria-hidden="true"
+              <Link to="/dashboard" className="setu-primary">
+                <span>Get Started</span>
+                <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                  <path
+                    d="M3.333 8h9.334M8 3.333L12.667 8 8 12.667"
+                    stroke="currentColor"
+                    strokeWidth="1.75"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </Link>
+            </motion.div>
+            <motion.div
+              whileHover={{ y: -4, scale: 1.02 }}
+              whileTap={{ scale: 0.97 }}
+              transition={hoverSpring}
+            >
+              <a
+                href="https://github.com/JejurkarYash/setu"
+                target="_blank"
+                rel="noreferrer"
+                className="setu-secondary"
               >
-                <path
-                  fill="currentColor"
-                  d="M12 .5a12 12 0 0 0-3.79 23.39c.6.11.82-.26.82-.58v-2.04c-3.34.73-4.04-1.42-4.04-1.42-.55-1.39-1.33-1.76-1.33-1.76-1.09-.75.08-.74.08-.74 1.2.09 1.84 1.23 1.84 1.23 1.07 1.83 2.8 1.3 3.48.99.11-.77.42-1.3.76-1.6-2.66-.3-5.46-1.33-5.46-5.93 0-1.31.47-2.38 1.24-3.22-.12-.3-.54-1.52.12-3.17 0 0 1.01-.32 3.3 1.23a11.5 11.5 0 0 1 6 0c2.29-1.55 3.3-1.23 3.3-1.23.66 1.65.24 2.87.12 3.17.77.84 1.24 1.91 1.24 3.22 0 4.61-2.8 5.62-5.47 5.92.43.37.81 1.1.81 2.22v3.29c0 .32.22.69.83.57A12 12 0 0 0 12 .5Z"
-                />
-              </svg>
-              <span>Github</span>
-              <motion.span
-                className="github-star-badge"
-                animate={{ scale: isHovered ? 1.08 : 1 }}
-              >
-                ★ Open Source
-              </motion.span>
-            </a>
-          </motion.div>
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path
+                    fill="currentColor"
+                    d="M12 .5a12 12 0 0 0-3.79 23.39c.6.11.82-.26.82-.58v-2.04c-3.34.73-4.04-1.42-4.04-1.42-.55-1.39-1.33-1.76-1.33-1.76-1.09-.75.08-.74.08-.74 1.2.09 1.84 1.23 1.84 1.23 1.07 1.83 2.8 1.3 3.48.99.11-.77.42-1.3.76-1.6-2.66-.3-5.46-1.33-5.46-5.93 0-1.31.47-2.38 1.24-3.22-.12-.3-.54-1.52.12-3.17 0 0 1.01-.32 3.3 1.23a11.5 11.5 0 0 1 6 0c2.29-1.55 3.3-1.23 3.3-1.23.66 1.65.24 2.87.12 3.17.77.84.24 1.91 1.24 3.22 0 4.61-2.8 5.62-5.47 5.92.43.37.81 1.1.81 2.22v3.29c0 .32.22.69.83.57A12 12 0 0 0 12 .5Z"
+                  />
+                </svg>
+                <span>GitHub</span>
+              </a>
+            </motion.div>
+          </div>
         </motion.div>
       </motion.div>
 
+      <div className="setu-graphic">
+        <Span />
+        {/* ruler through the gateway, plus its port */}
+        <span className="setu-ruler" aria-hidden="true" />
+        <span className="setu-port" aria-hidden="true" />
+        <span className="setu-tag setu-tag-in" aria-hidden="true">
+          APPLICATIONS
+        </span>
+        <span className="setu-tag setu-tag-gate" aria-hidden="true">
+          GATEWAY
+        </span>
+        <span className="setu-tag setu-tag-out" aria-hidden="true">
+          PROVIDERS
+        </span>
+      </div>
+
       <style>{`
-        .landing-hero {
+        .setu-hero {
           position: relative;
           isolation: isolate;
-          font-family: "Geist", sans-serif;
-          min-height: calc(92vh - 68px);
-          margin-left: clamp(20px, 6.5vw, 88px);
-          margin-right: clamp(20px, 2.5vw, 32px);
+          display: flex;
+          flex-direction: column;
+          justify-content: space-between;
+          min-height: clamp(640px, calc(100svh - 68px), 840px);
+          margin: 0 clamp(20px, 2.5vw, 32px) 0 clamp(20px, 6.5vw, 88px);
+          overflow: hidden;
           border-left: 1px solid #19191d;
           border-bottom: 1px solid #19191d;
-          display: flex;
-          align-items: flex-end;
-          padding: 0 0 57px;
-          overflow: hidden;
-          background-color: #060508;
+          background: #050505;
+          font-family: "Geist", sans-serif;
         }
 
-        /* Interactive Cursor Spotlight Glow */
-        .landing-cursor-spotlight {
-          position: absolute;
-          top: 10%;
-          left: 20%;
-          width: 600px;
-          height: 600px;
-          background: radial-gradient(circle, rgba(168, 85, 247, 0.08) 0%, rgba(217, 70, 239, 0.03) 45%, transparent 75%);
-          border-radius: 50%;
-          pointer-events: none;
-          z-index: 0;
-          filter: blur(50px);
-          transition: transform 0.2s cubic-bezier(0.1, 0.8, 0.3, 1);
+        .setu-top {
+          display: grid;
+          grid-template-columns: minmax(0, 1fr) minmax(260px, 340px);
+          align-items: end;
+          gap: clamp(24px, 4vw, 80px);
+          padding: clamp(44px, 8vh, 96px) clamp(20px, 3.4vw, 48px) 0;
         }
 
-        /* Cinematic Ambient Core Lighting */
-        .landing-ambient-core {
-          position: absolute;
-          top: 10%;
-          right: 10%;
-          width: 500px;
-          height: 500px;
-          background: radial-gradient(circle, rgba(232, 121, 249, 0.1) 0%, rgba(124, 58, 237, 0.04) 50%, transparent 80%);
-          border-radius: 50%;
-          filter: blur(90px);
-          pointer-events: none;
-          z-index: -1;
-          animation: corePulse 7s ease-in-out infinite alternate;
-        }
-
-        .landing-ambient-core-secondary {
-          position: absolute;
-          bottom: -10%;
-          left: 30%;
-          width: 400px;
-          height: 400px;
-          background: radial-gradient(circle, rgba(52, 211, 153, 0.05) 0%, transparent 70%);
-          border-radius: 50%;
-          filter: blur(80px);
-          pointer-events: none;
-          z-index: -1;
-          animation: corePulseSec 10s ease-in-out infinite alternate;
-        }
-
-        @keyframes corePulse {
-          0% { transform: scale(0.85) translate(0, 0); opacity: 0.4; }
-          100% { transform: scale(1.2) translate(-20px, 15px); opacity: 0.8; }
-        }
-
-        @keyframes corePulseSec {
-          0% { transform: scale(0.9); opacity: 0.3; }
-          100% { transform: scale(1.15); opacity: 0.6; }
-        }
-
-        .landing-flow-field {
-          position: absolute;
-          top: 0;
-          left: 0;
-          right: 0;
-          bottom: 0;
-          z-index: -1;
-          width: 100%;
-          height: 100%;
-          pointer-events: none;
-          overflow: hidden;
-        }
-
-        .landing-hero::before {
-          position: absolute;
-          inset: 0;
-          z-index: -2;
-          content: "";
-          background-image: linear-gradient(
-              rgba(255, 255, 255, 0.03) 1px,
-              transparent 1px
-            ),
-            linear-gradient(
-              90deg,
-              rgba(255, 255, 255, 0.03) 1px,
-              transparent 1px
-            );
-          background-position: 22px 0;
-          background-size: 72px 72px;
-          mask-image: linear-gradient(to bottom, transparent 2%, black 35%, black 100%);
-        }
-
-        .landing-hero-content {
-          width: 100%;
-          display: flex;
-          align-items: flex-end;
-          justify-content: space-between;
-          gap: 32px;
-          padding: 23px 22px 0;
-          border-top: 1px solid #1c1c22;
-          position: relative;
-          z-index: 2;
-          will-change: transform;
-        }
-
-        .landing-badge-wrapper {
-          display: inline-flex;
-          align-items: center;
-          gap: 9px;
-          padding: 6px 14px;
-          margin-bottom: 18px;
-          border-radius: 9999px;
-          border: 1px solid rgba(232, 121, 249, 0.3);
-          background: linear-gradient(90deg, rgba(232, 121, 249, 0.08), rgba(168, 85, 247, 0.03));
+        .setu-eyebrow {
+          margin: 0 0 24px;
+          color: #8f8f97;
           font-family: "JetBrains Mono", monospace;
-          font-size: 10.5px;
-          letter-spacing: 0.08em;
-          color: #f0abfc;
-          position: relative;
-          overflow: hidden;
-          box-shadow: 0 0 20px rgba(232, 121, 249, 0.1);
-          cursor: default;
+          font-size: 10px;
+          letter-spacing: 0.16em;
         }
 
-        .badge-shimmer {
-          position: absolute;
-          top: 0;
-          left: -100%;
-          width: 50%;
-          height: 100%;
-          background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.15), transparent);
-          animation: badgeShimmer 3s ease-in-out infinite;
-        }
-
-        @keyframes badgeShimmer {
-          0% { left: -100%; }
-          30%, 100% { left: 200%; }
-        }
-
-        .badge-pulse-dot {
-          width: 6px;
-          height: 6px;
-          border-radius: 50%;
-          background: #34D399;
-          box-shadow: 0 0 10px #34D399;
-          animation: dotBlink 2s ease-in-out infinite;
-        }
-
-        @keyframes dotBlink {
-          0%, 100% { opacity: 0.4; transform: scale(0.9); }
-          50% { opacity: 1; transform: scale(1.2); }
-        }
-
-        .landing-hero-copy h1 {
+        .setu-title {
           margin: 0;
           color: #f7f7f7;
-          font-size: clamp(34px, 3.4vw, 40px);
-          font-weight: 700;
-          letter-spacing: -0.045em;
-          line-height: 1.15;
+          font-size: clamp(46px, 6.6vw, 104px);
+          font-weight: 600;
+          letter-spacing: -0.07em;
+          line-height: 0.95;
         }
 
-        .landing-hero-accent-wrapper {
-          position: relative;
-          display: inline-block;
+        .setu-line {
+          display: block;
+          overflow: hidden;
+          padding-bottom: 0.08em;
         }
 
-        .landing-hero-accent {
-          color: #f0abfc;
-          background: linear-gradient(105deg, #ffffff 10%, #f0abfc 48%, #c084fc 88%);
-          background-clip: text;
-          -webkit-background-clip: text;
-          -webkit-text-fill-color: transparent;
-          filter: drop-shadow(0 0 25px rgba(232, 121, 249, 0.25));
+        .setu-line > span { display: block; }
+
+        .setu-aside { padding-bottom: 0.8vw; }
+
+        .setu-aside p {
+          max-width: 310px;
+          margin: 0;
+          color: #969ba3;
+          font-size: 15px;
+          line-height: 1.6;
         }
 
-        .accent-underline-glow {
-          position: absolute;
-          bottom: 2px;
-          left: 0;
-          width: 100%;
-          height: 2px;
-          background: linear-gradient(90deg, #e879f9, #34D399, transparent);
-          opacity: 0.6;
-          filter: blur(1px);
-        }
-
-        .landing-hero-copy p {
-          margin: 15px 0 0;
-          color: #a1a1aa;
-          font-family: "Geist", sans-serif;
-          font-size: 13px;
-          line-height: 1.4;
-          max-width: 580px;
-        }
-
-        .landing-hero-actions {
+        .setu-actions {
           display: flex;
           align-items: center;
-          gap: 20px;
-          padding: 0 clamp(0px, 7vw, 90px) 0 20px;
-          transform: translateY(-8px);
+          gap: 12px;
+          margin-top: 28px;
         }
 
-        /* Ultra High-End Clean Architectural Buttons */
-        .landing-primary-action,
-        .landing-secondary-action {
+        .setu-primary,
+        .setu-secondary {
           display: inline-flex;
           align-items: center;
           justify-content: center;
-          height: 50px;
-          position: relative;
-          overflow: hidden;
-          text-decoration: none;
-          font-family: "Geist", sans-serif;
-          font-weight: 600;
           gap: 10px;
+          height: 48px;
+          font-family: "Geist", sans-serif;
           font-size: 14.5px;
-          border-radius: 0;
-          transition: color 250ms ease, background 250ms ease, border-color 250ms ease,
-            box-shadow 250ms ease, transform 250ms ease;
+          font-weight: 600;
+          text-decoration: none;
+          transition: background 220ms ease, border-color 220ms ease, color 220ms ease;
         }
 
-        .landing-primary-action::after,
-        .landing-secondary-action::after {
+        .setu-primary { min-width: 148px; padding: 0 22px; background: #fff; color: #08070b; }
+        .setu-primary:hover { background: #f0abfc; }
+        .setu-primary svg { width: 15px; height: 15px; transition: transform 200ms ease; }
+        .setu-primary:hover svg { transform: translateX(4px); }
+
+        .setu-secondary {
+          min-width: 118px;
+          padding: 0 20px;
+          border: 1px solid #27272d;
+          background: #0d0d11;
+          color: #e4e4e7;
+        }
+
+        .setu-secondary:hover { border-color: #3a4247; background: #111318; color: #fff; }
+        .setu-secondary svg { width: 17px; height: 17px; flex: 0 0 auto; }
+
+        .setu-primary:focus-visible,
+        .setu-secondary:focus-visible { outline: 2px solid #f0abfc; outline-offset: 4px; }
+
+        /* ---- the span ---- */
+        .setu-graphic {
+          position: relative;
+          flex: 1;
+          min-height: 300px;
+          margin-top: clamp(24px, 5vh, 56px);
+          border-top: 1px solid #19191d;
+        }
+
+        .setu-span {
+          position: absolute;
+          inset: 0;
+          display: block;
+          width: 100%;
+          height: 100%;
+        }
+
+        .span-lines path {
+          fill: none;
+          stroke-width: 1;
+          vector-effect: non-scaling-stroke;
+          stroke-dasharray: 1;
+          stroke-dashoffset: 1;
+          animation: span-draw 1.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+          animation-delay: calc(var(--i) * 55ms + 350ms);
+        }
+
+        .span-beam {
+          stroke: #dce5e9;
+          stroke-width: 6;
+          vector-effect: non-scaling-stroke;
+          transition: stroke-width 350ms cubic-bezier(0.16, 1, 0.3, 1);
+          animation: span-beam-in 900ms cubic-bezier(0.16, 1, 0.3, 1) 900ms both;
+          transform-box: fill-box;
+          transform-origin: center;
+        }
+
+        .setu-graphic:hover .span-beam { stroke-width: 9; }
+
+        .span-route {
+          fill: none;
+          stroke: #67e8f9;
+          stroke-opacity: 0.45;
+          stroke-width: 1.5;
+          vector-effect: non-scaling-stroke;
+          stroke-dasharray: 100;
+          stroke-dashoffset: 100;
+          animation: span-route-in 1.8s cubic-bezier(0.16, 1, 0.3, 1) 1.1s forwards;
+          transition: stroke-opacity 400ms ease;
+        }
+
+        .setu-graphic:hover .span-route { stroke-opacity: 0.9; }
+
+        .span-pulse {
+          fill: none;
+          stroke: #a5f3fc;
+          stroke-width: 4;
+          stroke-linecap: round;
+          stroke-dasharray: 3 97;
+          stroke-dashoffset: 3;
+          vector-effect: non-scaling-stroke;
+          opacity: 0;
+          animation: span-travel 6s cubic-bezier(0.45, 0, 0.2, 1) 3s infinite;
+        }
+
+        .setu-ruler {
           position: absolute;
           top: 0;
           bottom: 0;
-          left: -45%;
-          width: 30%;
-          content: "";
-          background: linear-gradient(
-            90deg,
-            transparent,
-            rgba(255, 255, 255, 0.4),
-            transparent
-          );
-          transform: skewX(-20deg);
-          transition: left 550ms ease;
+          left: ${(NECK_X / W) * 100}%;
+          width: 1px;
+          background: linear-gradient(180deg, #202026, transparent 18%, transparent 82%, #202026);
         }
 
-        .landing-github-icon {
-          width: 17px;
-          height: 17px;
-          flex: 0 0 auto;
+        /* the one orchid mark: the gateway's port */
+        .setu-port {
+          position: absolute;
+          top: 50%;
+          left: ${(NECK_X / W) * 100}%;
+          width: 2px;
+          height: 26px;
+          background: #e879f9;
+          transform: translate(-50%, -50%);
+          animation: span-fade 700ms ease 1.4s both;
         }
 
-        .landing-primary-action {
-          min-width: 150px;
-          background: #ffffff;
-          color: #08070b;
-          padding: 0 24px;
-          box-shadow: 0 4px 20px rgba(255, 255, 255, 0.12);
-        }
-
-        .action-arrow-icon {
-          width: 15px;
-          height: 15px;
-          transition: transform 0.2s ease;
-        }
-
-        .landing-primary-action:hover .action-arrow-icon {
-          transform: translateX(4px);
-        }
-
-        .landing-secondary-action {
-          min-width: 140px;
-          border: 1px solid #27272d;
-          color: #e4e4e7;
-          background: rgba(12, 11, 16, 0.9);
-          padding: 0 20px;
-        }
-
-        .github-star-badge {
-          font-size: 10px;
+        .setu-tag {
+          position: absolute;
+          color: #565d66;
           font-family: "JetBrains Mono", monospace;
-          background: rgba(232, 121, 249, 0.12);
-          color: #f0abfc;
-          padding: 2px 6px;
-          border: 1px solid rgba(232, 121, 249, 0.25);
-          margin-left: 2px;
+          font-size: 10px;
+          letter-spacing: 0.14em;
+          animation: span-fade 800ms ease 1.2s both;
         }
 
-        .landing-primary-action:hover::after,
-        .landing-secondary-action:hover::after {
-          left: 130%;
+        .setu-tag-in { top: 14px; left: clamp(20px, 3.4vw, 48px); }
+        .setu-tag-out { top: 14px; right: clamp(20px, 3.4vw, 48px); }
+        .setu-tag-gate {
+          bottom: 14px;
+          left: ${(NECK_X / W) * 100}%;
+          transform: translateX(-50%);
+          color: #686873;
         }
 
-        .landing-primary-action:hover {
-          background: #f0abfc;
-          color: #08070b;
-          box-shadow: 0 8px 30px rgba(232, 121, 249, 0.35);
+        @keyframes span-draw { to { stroke-dashoffset: 0; } }
+        @keyframes span-route-in { to { stroke-dashoffset: 0; } }
+        @keyframes span-beam-in { from { opacity: 0; transform: scaleX(0.2); } to { opacity: 1; transform: scaleX(1); } }
+        @keyframes span-fade { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes span-travel {
+          0% { stroke-dashoffset: 3; opacity: 0.95; }
+          70% { stroke-dashoffset: -97; opacity: 0.95; }
+          72%, 100% { stroke-dashoffset: -97; opacity: 0; }
         }
 
-        .landing-secondary-action:hover {
-          border-color: rgba(232, 121, 249, 0.6);
-          color: #fff;
-          background: #141318;
-          box-shadow: 0 8px 30px rgba(232, 121, 249, 0.15);
+        .setu-hero.is-paused * { animation-play-state: paused !important; }
+
+        @media (max-width: 860px) {
+          .setu-hero { min-height: auto; }
+          .setu-top { grid-template-columns: 1fr; align-items: start; gap: 28px; padding-top: 52px; }
+          .setu-title { font-size: clamp(44px, 13vw, 80px); }
+          .setu-aside { padding-bottom: 0; }
+          .setu-graphic { min-height: 260px; margin-top: 44px; }
         }
 
-        @media (max-width: 768px) {
-          .landing-hero {
-            min-height: calc(100vh - 68px);
-            margin-left: 0;
-            margin-right: 0;
-            padding: 0 20px 40px;
-          }
+        @media (max-width: 640px) {
+          .setu-hero { margin-left: 0; margin-right: 0; border-left: 0; }
+          .setu-top { padding-left: 20px; padding-right: 20px; }
+          .setu-actions { flex-direction: column; align-items: stretch; }
+          .setu-actions > div,
+          .setu-actions a { width: 100%; }
+          .setu-tag-in { left: 20px; }
+          .setu-tag-out { right: 20px; }
+          .setu-tag-gate { display: none; }
+        }
 
-          .landing-flow-field {
-            bottom: 0;
-            height: 100%;
-          }
-
-          .landing-hero-content {
-            align-items: flex-start;
-            flex-direction: column;
-            padding: 24px 0 0;
-            transform: none !important;
-          }
-
-          .landing-hero-copy h1 {
-            font-size: clamp(30px, 8.5vw, 40px);
-          }
-
-          .landing-desktop-break {
-            display: none;
-          }
-
-          .landing-hero-copy p {
-            max-width: 100%;
-            font-size: 13px;
-            line-height: 1.5;
-          }
-
-          .landing-hero-actions {
-            width: 100%;
-            padding: 0;
-            transform: none;
-            flex-direction: column;
-            align-items: stretch;
-            gap: 12px;
-          }
-
-          .landing-primary-action,
-          .landing-secondary-action {
-            width: 100%;
-            height: 48px;
-            font-size: 14px;
-          }
+        @media (prefers-reduced-motion: reduce) {
+          .span-lines path { animation: none; stroke-dashoffset: 0; }
+          .span-beam, .setu-port, .setu-tag { animation: none; }
+          .span-route { animation: none; stroke-dashoffset: 0; }
+          .span-pulse { animation: none; opacity: 0; }
         }
       `}</style>
-    </motion.section>
+    </section>
   );
 }
