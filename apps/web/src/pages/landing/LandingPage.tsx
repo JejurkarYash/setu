@@ -21,7 +21,9 @@ export default function LandingPage() {
   useEffect(() => {
     const page = pageRef.current;
     if (!page || typeof IntersectionObserver === "undefined") return;
-    const sections = page.querySelectorAll<HTMLElement>("main > [data-chapter]");
+    const sections = page.querySelectorAll<HTMLElement>(
+      "main > [data-chapter]",
+    );
     const observer = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {

@@ -1,233 +1,145 @@
-import React, { useState } from "react";
-import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type KeyboardEvent,
+  type ReactNode,
+} from "react";
+import { motion, useInView, useReducedMotion } from "framer-motion";
 
-const LANGUAGES = [
-  {
-    id: "go",
-    label: "Go",
-    icon: (
-      <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none">
-        <circle cx="12" cy="12" r="10" fill="#00ADD8" fillOpacity="0.2" />
-        <path
-          d="M11.83 4C7.5 4 4 7.35 4 11.45c0 2.5 1.25 4.7 3.2 6.05V20h2.8v-1.65c.6.15 1.24.25 1.93.25 4.33 0 7.83-3.35 7.83-7.45S16.16 4 11.83 4z"
-          fill="#00ADD8"
-        />
-      </svg>
-    ),
-  },
-  {
-    id: "python",
-    label: "Python",
-    icon: (
-      <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none">
-        <path
-          d="M11.92 2C8.77 2 6.09 2.65 6.09 4.18v2.18h5.83v.73H5.25C2.63 7.09 2 8.78 2 11.2c0 2.42.45 4.11 3.25 4.11h1.75v-1.82c0-1.74 1.48-3.18 3.25-3.18h4.5c1.1 0 2-.9 2-2V4.18C17.75 2.65 15.07 2 11.92 2z"
-          fill="#387EB8"
-        />
-        <path
-          d="M12.08 22c3.15 0 5.83-.65 5.83-2.18v-2.18h-5.83v-.73h6.67c2.62 0 3.25-1.69 3.25-4.11 0-2.42-.45-4.11-3.25-4.11h-1.75v1.82c0 1.74-1.48 3.18-3.25 3.18h-4.5c-1.1 0-2 .9-2 2v2.91c0 1.53 2.68 2.18 5.83 2.18z"
-          fill="#FFE873"
-        />
-      </svg>
-    ),
-  },
-  {
-    id: "typescript",
-    label: "TypeScript",
-    icon: (
-      <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none">
-        <rect width="24" height="24" rx="4" fill="#3178C6" />
-        <text x="4.3" y="16.8" fill="#fff" fontSize="10.5" fontWeight="700" fontFamily="Arial, sans-serif">TS</text>
-      </svg>
-    ),
-  },
-  {
-    id: "javascript",
-    label: "JavaScript",
-    icon: (
-      <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none">
-        <rect width="24" height="24" rx="4" fill="#F7DF1E" />
-        <text x="4.2" y="16.8" fill="#111" fontSize="10.5" fontWeight="700" fontFamily="Arial, sans-serif">JS</text>
-      </svg>
-    ),
-  },
-  {
-    id: "curl",
-    label: "cURL",
-    icon: (
-      <svg
-        className="w-4 h-4 shrink-0"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="#67E8F9"
-        strokeWidth="2.2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      >
-        <polyline points="4 17 10 11 4 5" />
-        <line x1="12" y1="19" x2="20" y2="19" />
-      </svg>
-    ),
-  },
-  {
-    id: "java",
-    label: "Java",
-    icon: (
-      <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none">
-        <path
-          d="M11.53 2c0 .28.11.54.3.73.19.19.45.3.73.3 1.15 0 2.28.31 3.27.9.99.59 1.79 1.44 2.3 2.45.51 1.01.78 2.14.78 3.29 0 .28.11.54.3.73.19.19.45.3.73.3.28 0 .54-.11.73-.3.19-.19.3-.45.3-.73 0-1.43-.32-2.85-.94-4.16-.62-1.31-1.51-2.45-2.63-3.32-1.12-.87-2.45-1.44-3.86-1.68-.28-.05-.55.12-.6.4-.04.23.1.45.33.52z"
-          fill="#f89820"
-        />
-        <path
-          d="M7.5 7.5c-.28 0-.54.11-.73.3-.19.19-.3.45-.3.73 0 2.21.88 4.33 2.44 5.89 1.56 1.56 3.68 2.44 5.89 2.44.28 0 .54-.11.73-.3.19-.19.3-.45.3-.73 0-.28-.11-.54-.3-.73-.19-.19-.45-.3-.73-.3-1.77 0-3.47-.7-4.73-1.95C9.2 11.97 8.5 10.27 8.5 8.53c0-.28-.11-.54-.3-.73-.19-.19-.45-.3-.7-.3z"
-          fill="#5382a1"
-        />
-        <path
-          d="M12 18.5c-1.38 0-2.71-.35-3.9-1.01-1.19-.66-2.17-1.61-2.83-2.76-.66-1.15-1.02-2.46-1.02-3.83 0-.28-.11-.54-.3-.73-.19-.19-.45-.3-.73-.3-.28 0-.54.11-.73.3-.19.19-.3.45-.3.73 0 1.63.42 3.22 1.21 4.62.79 1.4 1.91 2.55 3.27 3.32 1.36.77 2.93 1.18 4.54 1.18.28 0 .54-.11.73-.3.19-.19.3-.45.3-.73 0-.28-.11-.54-.3-.73-.19-.19-.45-.3-.73-.3z"
-          fill="#e76f00"
-        />
-      </svg>
-    ),
-  },
-  {
-    id: "php",
-    label: "PHP",
-    icon: (
-      <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none">
-        <ellipse cx="12" cy="12" rx="10" ry="6.8" fill="#777BB4" />
-        <text x="5.1" y="14.8" fill="#fff" fontSize="6.8" fontWeight="700" fontFamily="Arial, sans-serif">PHP</text>
-      </svg>
-    ),
-  },
-  {
-    id: "ruby",
-    label: "Ruby",
-    icon: (
-      <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none">
-        <path d="M12 2L2 9l10 13L22 9L12 2z" fill="#CC342D" />
-        <path d="M12 5.2l6.8 4.8-6.8 9.2L5.2 10 12 5.2z" fill="#E24329" />
-      </svg>
-    ),
-  },
+/* ------------------------------------------------------------------
+   Quick Start
+   - Every example is generated from one request spec per provider, so the
+     URL, headers and body can never drift apart between languages.
+   - Language tabs are text only. Provider marks load from /public/logos/
+     (openai.svg, anthropic.svg, gemini.svg) and fall back to a neutral
+     monogram; nothing is hand-drawn.
+   - The route strip above the code shows the same idea as the rest of the
+     page: your app, Setu, then the selected provider.
+   - Endpoints and response bodies are illustrative: confirm the host,
+     paths and header names against your real API before shipping.
+------------------------------------------------------------------- */
+
+const ease = [0.16, 1, 0.3, 1] as const;
+const css = (o: Record<string, string | number>) => o as CSSProperties;
+
+type LangId =
+  | "go"
+  | "python"
+  | "typescript"
+  | "javascript"
+  | "curl"
+  | "java"
+  | "php"
+  | "ruby";
+type ProviderId = "openai" | "anthropic" | "gemini";
+
+const LANGUAGES: { id: LangId; label: string }[] = [
+  { id: "go", label: "Go" },
+  { id: "python", label: "Python" },
+  { id: "typescript", label: "TypeScript" },
+  { id: "javascript", label: "JavaScript" },
+  { id: "curl", label: "cURL" },
+  { id: "java", label: "Java" },
+  { id: "php", label: "PHP" },
+  { id: "ruby", label: "Ruby" },
 ];
 
-const PROVIDERS = [
+const PROMPT = "Hello through Setu gateway!";
+const HOST = "https://api.setu.dev";
+
+type Provider = {
+  id: ProviderId;
+  label: string;
+  logo: string;
+  endpoint: string;
+  headers: [string, string][];
+  body: unknown;
+  response: string;
+};
+
+const PROVIDERS: Provider[] = [
   {
     id: "openai",
     label: "OpenAI",
-    model: "gpt-4o",
-    icon: (
-      <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none">
-        <path
-          d="M22.2819 9.8211a5.9847 5.9847 0 0 0-.5157-4.9108 6.0462 6.0462 0 0 0-6.5098-2.9A6.0651 6.0651 0 0 0 4.9807 4.1818a5.9847 5.9847 0 0 0-3.9977 2.9 6.0462 6.0462 0 0 0 .7427 7.0966 5.9807 5.9807 0 0 0 .5157 4.9108 6.0512 6.0512 0 0 0 6.5098 2.9 6.0512 6.0512 0 0 0 10.2862-3.1578 5.9807 5.9807 0 0 0 3.9977-2.9 6.0462 6.0462 0 0 0-.7427-7.0966z"
-          fill="#10A37F"
-        />
-        <path
-          d="M15.5 11.2v-1.5c0-.6-.4-1-1-1h-2c-.6 0-1 .4-1 1v1.5c0 .6.4 1 1 1h2c.6 0 1-.4 1-1z"
-          fill="#fff"
-        />
-      </svg>
-    ),
+    logo: "/logos/openai.svg",
+    endpoint: "/v1/chat/completions",
+    headers: [
+      ["Content-Type", "application/json"],
+      ["Authorization", "Bearer {KEY}"],
+    ],
+    body: { model: "gpt-4o", messages: [{ role: "user", content: PROMPT }] },
+    response: `{
+  "id": "chatcmpl-example",
+  "object": "chat.completion",
+  "model": "gpt-4o",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "Hello! Routed through Setu."
+      },
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 16,
+    "completion_tokens": 25,
+    "total_tokens": 41
+  }
+}`,
   },
   {
     id: "anthropic",
     label: "Anthropic",
-    model: "claude-3-5-sonnet-20241022",
-    icon: (
-      <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none">
-        <path
-          d="M17.522 4.155h-4.322L5.86 21.845h4.156l1.722-4.522h7.622l1.722 4.522h4.311L17.522 4.155Zm-3.822 9.611 2.8-7.533 2.8 7.533h-5.6Z"
-          fill="#D97706"
-        />
-      </svg>
-    ),
-  },
-  {
-    id: "gemini",
-    label: "Google Gemini",
-    model: "gemini-1.5-pro",
-    icon: (
-      <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none">
-        <defs>
-          <linearGradient id="gemini-spark-gradient" x1="3" y1="3" x2="21" y2="21">
-            <stop offset="0" stopColor="#4285F4" />
-            <stop offset="0.34" stopColor="#34A853" />
-            <stop offset="0.68" stopColor="#FBBC04" />
-            <stop offset="1" stopColor="#EA4335" />
-          </linearGradient>
-        </defs>
-        <path
-          d="M12 1.5c.55 5.2 1.45 8.2 3.55 10.1 1.9 1.75 4.15 2.45 6.95 2.9-2.8.45-5.05 1.15-6.95 2.9-2.1 1.9-3 4.9-3.55 10.1-.55-5.2-1.45-8.2-3.55-10.1-1.9-1.75-4.15-2.45-6.95-2.9 2.8-.45 5.05-1.15 6.95-2.9C10.55 9.7 11.45 6.7 12 1.5Z"
-          fill="url(#gemini-spark-gradient)"
-        />
-      </svg>
-    ),
-  },
-];
-
-function getProviderConfig(providerId: string) {
-  const provider = PROVIDERS.find((p) => p.id === providerId) || PROVIDERS[0];
-  const configByProvider: Record<
-    string,
-    { route: string; model: string; endpoint: string }
-  > = {
-    openai: {
-      route: "https://api.setu.dev/v1/chat/completions",
-      endpoint: "/v1/chat/completions",
-      model: provider.model,
+    logo: "/logos/anthropic.svg",
+    endpoint: "/anthropic/v1/messages",
+    headers: [
+      ["Content-Type", "application/json"],
+      ["x-api-key", "{KEY}"],
+      ["anthropic-version", "2023-06-01"],
+    ],
+    body: {
+      model: "claude-3-5-sonnet-20241022",
+      max_tokens: 1024,
+      messages: [{ role: "user", content: PROMPT }],
     },
-    anthropic: {
-      route: "https://api.setu.dev/anthropic/v1/messages",
-      endpoint: "/anthropic/v1/messages",
-      model: provider.model,
-    },
-    gemini: {
-      route: `https://api.setu.dev/v1beta/models/${provider.model}:generateContent`,
-      endpoint: `/v1beta/models/${provider.model}:generateContent`,
-      model: provider.model,
-    },
-  };
-  return {
-    ...(configByProvider[providerId] ?? configByProvider.openai),
-    provider,
-  };
-}
-
-function getCodeExample(lang: string, providerId: string) {
-  const provider = PROVIDERS.find((p) => p.id === providerId) || PROVIDERS[0];
-  const config = getProviderConfig(providerId);
-  const model = config.model;
-  const route = config.route;
-  const bodyPrompt = "Hello through Setu gateway!";
-
-  const commonResponse =
-    providerId === "anthropic"
-      ? `{
-  "id": "msg_setu_${lang}_${provider.id}",
+    response: `{
+  "id": "msg_example",
   "type": "message",
   "role": "assistant",
-  "model": "${model}",
+  "model": "claude-3-5-sonnet-20241022",
   "content": [
     {
       "type": "text",
-      "text": "Hello! Routed successfully through Setu via ${provider.label}."
+      "text": "Hello! Routed through Setu."
     }
   ],
   "stop_reason": "end_turn",
   "usage": {
     "input_tokens": 16,
-    "output_tokens": 25,
-    "total_tokens": 41
+    "output_tokens": 25
   }
-}`
-      : providerId === "gemini"
-        ? `{
+}`,
+  },
+  {
+    id: "gemini",
+    label: "Google Gemini",
+    logo: "/logos/gemini.svg",
+    endpoint: "/v1beta/models/gemini-1.5-pro:generateContent",
+    headers: [
+      ["Content-Type", "application/json"],
+      ["x-goog-api-key", "{KEY}"],
+    ],
+    body: { contents: [{ parts: [{ text: PROMPT }] }] },
+    response: `{
   "candidates": [
     {
       "content": {
-        "parts": [
-          { "text": "Hello! Routed successfully through Setu via ${provider.label}." }
-        ],
+        "parts": [{ "text": "Hello! Routed through Setu." }],
         "role": "model"
       },
       "finishReason": "STOP"
@@ -238,735 +150,648 @@ function getCodeExample(lang: string, providerId: string) {
     "candidatesTokenCount": 25,
     "totalTokenCount": 41
   }
-}`
-        : `{
-  "id": "msg_setu_${lang}_${provider.id}",
-  "object": "chat.completion",
-  "created": 1711984215,
-  "model": "${model}",
-  "choices": [
-    {
-      "index": 0,
-      "message": {
-        "role": "assistant",
-        "content": "Hello! Routed successfully through Setu via ${provider.label}."
-      },
-      "finish_reason": "stop"
-    }
-  ],
-  "usage": {
-    "prompt_tokens": 16,
-    "completion_tokens": 25,
-    "total_tokens": 41
+}`,
   },
-  "setu_metadata": {
-    "gateway_latency_ms": 3.12,
-    "provider": "${provider.id}",
-    "cached": false
-  }
-}`;
+];
 
-  const goCode = [
-    "package main",
-    "",
-    "import (",
-    '  "bytes"',
-    '  "encoding/json"',
-    '  "fmt"',
-    '  "net/http"',
-    '  "os"',
-    ")",
-    "",
-    "func main() {",
-    '  apiKey := os.Getenv("SETU_API_KEY")',
-    "  body, _ := json.Marshal(map[string]any{",
-    `    "model": "${model}",`,
-    providerId === "gemini"
-      ? `    "contents": []map[string]any{{"parts": []map[string]string{{"text": "${bodyPrompt}"}}}},`
-      : `    "messages": []map[string]string{{"role": "user", "content": "${bodyPrompt}"}},`,
-    "  })",
-    "",
-    `  req, err := http.NewRequest("POST", "${route}", bytes.NewReader(body))`,
-    "  if err != nil { panic(err) }",
-    "",
-    '  req.Header.Set("Content-Type", "application/json")',
-    providerId === "openai"
-      ? '  req.Header.Set("Authorization", "Bearer "+apiKey)'
-      : providerId === "anthropic"
-        ? '  req.Header.Set("x-api-key", apiKey)\n  req.Header.Set("anthropic-version", "2023-06-01")'
-        : '  req.Header.Set("x-goog-api-key", apiKey)',
-    "",
-    "  resp, err := http.DefaultClient.Do(req)",
-    "  if err != nil { panic(err) }",
-    "  defer resp.Body.Close()",
-    "",
-    "  fmt.Println(resp.Status)",
-    "}",
-  ].join("\n");
+/* ---------------- code generation ---------------- */
 
-  const pythonPayload =
-    providerId === "anthropic"
-      ? `payload = {
-    "model": "${model}",
-    "max_tokens": 1024,
-    "messages": [{"role": "user", "content": "${bodyPrompt}"}],
-}`
-      : providerId === "gemini"
-        ? `payload = {
-    "contents": [{"parts": [{"text": "${bodyPrompt}"}]}],
-    "generationConfig": {"temperature": 0.2},
-}`
-        : `payload = {
-    "model": "${model}",
-    "messages": [{"role": "user", "content": "${bodyPrompt}"}],
-}`;
+const indent = (text: string, spaces: number) =>
+  text.replace(/\n/g, "\n" + " ".repeat(spaces));
 
-  const pythonHeaders = [
-    '    "Content-Type": "application/json",',
-    providerId === "openai"
-      ? '    "Authorization": f"Bearer {setu_api_key}",'
-      : providerId === "anthropic"
-        ? '    "x-api-key": setu_api_key,\n    "anthropic-version": "2023-06-01",'
-        : '    "x-goog-api-key": setu_api_key,',
-  ].join("\n");
+// Turns a header value into a language expression. `fn` receives the literal
+// text before {KEY}; values without {KEY} become plain quoted strings.
+const hv = (value: string, fn: (pre: string) => string) =>
+  value.includes("{KEY}") ? fn(value.split("{KEY}")[0]) : JSON.stringify(value);
 
-  const pythonCode = [
-    "import os",
-    "import requests",
-    "",
-    'setu_api_key = os.getenv("SETU_API_KEY")',
-    `url = "${route}"`,
-    "",
-    pythonPayload,
-    "",
-    "headers = {",
-    pythonHeaders,
-    "}",
-    "",
-    "response = requests.post(url, headers=headers, json=payload, timeout=30)",
-    "print(response.status_code)",
-    "print(response.json())",
-  ].join("\n");
-
-  const typeScriptBaseURL =
-    providerId === "openai"
-      ? "https://api.setu.dev/v1"
-      : providerId === "anthropic"
-        ? "https://api.setu.dev/anthropic"
-        : "https://api.setu.dev";
-
-  const typeScriptHeaders =
-    providerId === "openai"
-      ? '    "Authorization": `Bearer ${apiKey}`,'
-      : providerId === "anthropic"
-        ? '    "x-api-key": apiKey,\n    "anthropic-version": "2023-06-01",'
-        : '    "x-goog-api-key": apiKey,';
-
-  const typeScriptCode = [
-    'import OpenAI from "openai";',
-    "",
-    "const apiKey = process.env.SETU_API_KEY!;",
-    "",
-    "const client = new OpenAI({",
-    `  baseURL: "${typeScriptBaseURL}",`,
-    "  apiKey,",
-    "  defaultHeaders: {",
-    typeScriptHeaders,
-    "  },",
-    "});",
-    "",
-    "const response = await client.chat.completions.create({",
-    `  model: "${model}",`,
-    `  messages: [{ role: "user", content: "${bodyPrompt}" }],`,
-    "});",
-    "",
-    "console.log(response.choices[0].message.content);",
-  ].join("\n");
-
-  const curlBody =
-    providerId === "gemini"
-      ? `{ "contents": [{ "parts": [{ "text": "${bodyPrompt}" }] }] }`
-      : `{ "model": "${model}", "messages": [{ "role": "user", "content": "${bodyPrompt}" }] }`;
-
-  const curlHeaders = [
-    '  -H "Content-Type: application/json"',
-    providerId === "openai"
-      ? '  -H "Authorization: Bearer $SETU_API_KEY"'
-      : providerId === "anthropic"
-        ? '  -H "x-api-key: $SETU_API_KEY" \\\n  -H "anthropic-version: 2023-06-01"'
-        : '  -H "x-goog-api-key: $SETU_API_KEY"',
-  ].join(" \\\n");
-
-  const curlCode = `curl -X POST "${route}" \\\n${curlHeaders} \\\n  -d '${curlBody}'`;
-
-  const javaPayload =
-    providerId === "anthropic"
-      ? `String json = "{\\\"model\\\":\\\"${model}\\\",\\\"max_tokens\\\":1024,\\\"messages\\\":[{\\\"role\\\":\\\"user\\\",\\\"content\\\":\\\"${bodyPrompt}\\\"}]}";`
-      : providerId === "gemini"
-        ? `String json = "{\\\"contents\\\":[{\\\"parts\\\":[{\\\"text\\\":\\\"${bodyPrompt}\\\"}]}]}";`
-        : `String json = "{\\\"model\\\":\\\"${model}\\\",\\\"messages\\\":[{\\\"role\\\":\\\"user\\\",\\\"content\\\":\\\"${bodyPrompt}\\\"}]}";`;
-
-  const javaHeaders = [
-    '      .header("Content-Type", "application/json")',
-    providerId === "openai"
-      ? '      .header("Authorization", "Bearer " + System.getenv("SETU_API_KEY"))'
-      : providerId === "anthropic"
-        ? '      .header("x-api-key", System.getenv("SETU_API_KEY"))\n      .header("anthropic-version", "2023-06-01")'
-        : '      .header("x-goog-api-key", System.getenv("SETU_API_KEY"))',
-  ].join("\n");
-
-  const javaCode = [
-    "import java.net.URI;",
-    "import java.net.http.HttpClient;",
-    "import java.net.http.HttpRequest;",
-    "import java.net.http.HttpResponse;",
-    "",
-    "public class SetuClient {",
-    "  public static void main(String[] args) throws Exception {",
-    `    ${javaPayload}`,
-    "",
-    "    HttpClient client = HttpClient.newHttpClient();",
-    "    HttpRequest request = HttpRequest.newBuilder()",
-    `      .uri(URI.create("${route}"))`,
-    javaHeaders,
-    "      .POST(HttpRequest.BodyPublishers.ofString(json))",
-    "      .build();",
-    "",
-    "    HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());",
-    "    System.out.println(response.body());",
-    "  }",
-    "}",
-  ].join("\n");
-
-  const phpPayload =
-    providerId === "anthropic"
-      ? `$payload = [\n  'model' => '${model}',\n  'max_tokens' => 1024,\n  'messages' => [\n    ['role' => 'user', 'content' => '${bodyPrompt}'],\n  ],\n];`
-      : providerId === "gemini"
-        ? `$payload = [\n  'contents' => [[\n    'parts' => [[\n      'text' => '${bodyPrompt}',\n    ]],\n  ]],\n  'generationConfig' => ['temperature' => 0.2],\n];`
-        : `$payload = [\n  'model' => '${model}',\n  'messages' => [\n    ['role' => 'user', 'content' => '${bodyPrompt}'],\n  ],\n];`;
-
-  const phpHeaders = [
-    "  'Content-Type: application/json',",
-    providerId === "openai"
-      ? "  'Authorization: Bearer ' . $apiKey,"
-      : providerId === "anthropic"
-        ? "  'x-api-key: ' . $apiKey,\n  'anthropic-version: 2023-06-01',"
-        : "  'x-goog-api-key: ' . $apiKey,",
-  ].join("\n");
-
-  const phpCode = [
-    "<?php",
-    "$apiKey = getenv('SETU_API_KEY');",
-    phpPayload,
-    "",
-    `$ch = curl_init('${route}');`,
-    "curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);",
-    "curl_setopt($ch, CURLOPT_POST, true);",
-    "curl_setopt($ch, CURLOPT_HTTPHEADER, [",
-    phpHeaders,
-    "]);",
-    "curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload));",
-    "$response = curl_exec($ch);",
-    "curl_close($ch);",
-    "",
-    "echo $response;",
-    "?>",
-  ].join("\n");
-
-  const rubyPayload =
-    providerId === "anthropic"
-      ? `payload = {\n  model: '${model}',\n  max_tokens: 1024,\n  messages: [{ role: 'user', content: '${bodyPrompt}' }]\n}`
-      : providerId === "gemini"
-        ? `payload = {\n  contents: [{ parts: [{ text: '${bodyPrompt}' }] }],\n  generationConfig: { temperature: 0.2 }\n}`
-        : `payload = {\n  model: '${model}',\n  messages: [{ role: 'user', content: '${bodyPrompt}' }]\n}`;
-
-  const rubyHeaders = [
-    providerId === "openai"
-      ? "request['Authorization'] = 'Bearer ' + ENV.fetch('SETU_API_KEY')"
-      : providerId === "anthropic"
-        ? "request['x-api-key'] = ENV.fetch('SETU_API_KEY')\nrequest['anthropic-version'] = '2023-06-01'"
-        : "request['x-goog-api-key'] = ENV.fetch('SETU_API_KEY')",
-  ]
-    .filter(Boolean)
-    .join("\n");
-
-  const rubyCode = [
-    "require 'net/http'",
-    "require 'uri'",
-    "require 'json'",
-    "",
-    `uri = URI.parse('${route}')`,
-    "request = Net::HTTP::Post.new(uri)",
-    "request['Content-Type'] = 'application/json'",
-    rubyHeaders,
-    "",
-    rubyPayload,
-    "request.body = payload.to_json",
-    "response = Net::HTTP.start(uri.hostname, uri.port, use_ssl: true) { |http| http.request(request) }",
-    "puts response.body",
-  ].join("\n");
+function generate(lang: LangId, p: Provider): string {
+  const url = HOST + p.endpoint;
+  const compact = JSON.stringify(p.body);
+  const pretty = JSON.stringify(p.body, null, 2);
 
   switch (lang) {
     case "go":
-      return { language: "go", code: goCode, response: commonResponse };
+      return [
+        "package main",
+        "",
+        "import (",
+        '\t"bytes"',
+        '\t"fmt"',
+        '\t"io"',
+        '\t"net/http"',
+        '\t"os"',
+        ")",
+        "",
+        "func main() {",
+        `\tbody := []byte(\`${compact}\`)`,
+        "",
+        `\treq, err := http.NewRequest("POST", "${url}", bytes.NewReader(body))`,
+        "\tif err != nil {",
+        "\t\tpanic(err)",
+        "\t}",
+        ...p.headers.map(
+          ([k, v]) =>
+            `\treq.Header.Set("${k}", ${hv(v, (pre) =>
+              pre
+                ? `"${pre}" + os.Getenv("SETU_API_KEY")`
+                : 'os.Getenv("SETU_API_KEY")',
+            )})`,
+        ),
+        "",
+        "\tresp, err := http.DefaultClient.Do(req)",
+        "\tif err != nil {",
+        "\t\tpanic(err)",
+        "\t}",
+        "\tdefer resp.Body.Close()",
+        "",
+        "\tout, _ := io.ReadAll(resp.Body)",
+        "\tfmt.Println(resp.Status, string(out))",
+        "}",
+      ].join("\n");
+
     case "python":
-      return { language: "python", code: pythonCode, response: commonResponse };
+      return [
+        "import os",
+        "import requests",
+        "",
+        'setu_api_key = os.environ["SETU_API_KEY"]',
+        "",
+        `payload = ${pretty}`,
+        "",
+        "response = requests.post(",
+        `    "${url}",`,
+        "    headers={",
+        ...p.headers.map(
+          ([k, v]) =>
+            `        "${k}": ${hv(v, (pre) => (pre ? `f"${pre}{setu_api_key}"` : "setu_api_key"))},`,
+        ),
+        "    },",
+        "    json=payload,",
+        "    timeout=30,",
+        ")",
+        "",
+        "print(response.status_code)",
+        "print(response.json())",
+      ].join("\n");
+
     case "typescript":
-      return {
-        language: "typescript",
-        code: typeScriptCode,
-        response: commonResponse,
-      };
     case "javascript":
-      return {
-        language: "javascript",
-        code: typeScriptCode,
-        response: commonResponse,
-      };
+      return [
+        'const apiKey = process.env.SETU_API_KEY ?? "";',
+        "",
+        `const response = await fetch("${url}", {`,
+        '  method: "POST",',
+        "  headers: {",
+        ...p.headers.map(
+          ([k, v]) =>
+            `    "${k}": ${hv(v, (pre) => (pre ? "`" + pre + "${apiKey}" + "`" : "apiKey"))},`,
+        ),
+        "  },",
+        `  body: JSON.stringify(${indent(pretty, 2)}),`,
+        "});",
+        "",
+        lang === "typescript"
+          ? "const data: unknown = await response.json();"
+          : "const data = await response.json();",
+        "console.log(response.status, data);",
+      ].join("\n");
+
     case "curl":
-      return { language: "bash", code: curlCode, response: commonResponse };
+      return [
+        `curl -X POST "${url}" \\`,
+        ...p.headers.map(
+          ([k, v]) => `  -H "${k}: ${v.replace("{KEY}", "$SETU_API_KEY")}" \\`,
+        ),
+        `  -d '${compact}'`,
+      ].join("\n");
+
     case "java":
-      return { language: "java", code: javaCode, response: commonResponse };
+      return [
+        "import java.net.URI;",
+        "import java.net.http.HttpClient;",
+        "import java.net.http.HttpRequest;",
+        "import java.net.http.HttpResponse;",
+        "",
+        "public class SetuClient {",
+        "  public static void main(String[] args) throws Exception {",
+        '    String apiKey = System.getenv("SETU_API_KEY");',
+        `    String json = ${JSON.stringify(compact)};`,
+        "",
+        "    HttpRequest request = HttpRequest.newBuilder()",
+        `        .uri(URI.create("${url}"))`,
+        ...p.headers.map(
+          ([k, v]) =>
+            `        .header("${k}", ${hv(v, (pre) => (pre ? `"${pre}" + apiKey` : "apiKey"))})`,
+        ),
+        "        .POST(HttpRequest.BodyPublishers.ofString(json))",
+        "        .build();",
+        "",
+        "    HttpResponse<String> response = HttpClient.newHttpClient()",
+        "        .send(request, HttpResponse.BodyHandlers.ofString());",
+        '    System.out.println(response.statusCode() + " " + response.body());',
+        "  }",
+        "}",
+      ].join("\n");
+
     case "php":
-      return { language: "php", code: phpCode, response: commonResponse };
+      return [
+        "<?php",
+        "$apiKey = getenv('SETU_API_KEY');",
+        `$payload = '${compact}';`,
+        "",
+        `$ch = curl_init('${url}');`,
+        "curl_setopt_array($ch, [",
+        "    CURLOPT_POST => true,",
+        "    CURLOPT_RETURNTRANSFER => true,",
+        "    CURLOPT_HTTPHEADER => [",
+        ...p.headers.map(([k, v]) =>
+          v.includes("{KEY}")
+            ? `        '${k}: ${v.split("{KEY}")[0]}' . $apiKey,`
+            : `        '${k}: ${v}',`,
+        ),
+        "    ],",
+        "    CURLOPT_POSTFIELDS => $payload,",
+        "]);",
+        "",
+        "$response = curl_exec($ch);",
+        "curl_close($ch);",
+        "",
+        "echo $response;",
+      ].join("\n");
+
     case "ruby":
-      return { language: "ruby", code: rubyCode, response: commonResponse };
-    default:
-      return {
-        language: "bash",
-        code: "# Unsupported language",
-        response: "{}",
-      };
+      return [
+        "require 'net/http'",
+        "require 'uri'",
+        "",
+        `uri = URI('${url}')`,
+        "request = Net::HTTP::Post.new(uri)",
+        ...p.headers.map(
+          ([k, v]) =>
+            `request['${k}'] = ${hv(v, (pre) =>
+              pre
+                ? `"${pre}#{ENV.fetch('SETU_API_KEY')}"`
+                : "ENV.fetch('SETU_API_KEY')",
+            )}`,
+        ),
+        `request.body = '${compact}'`,
+        "",
+        "response = Net::HTTP.start(uri.hostname, uri.port, use_ssl: true) do |http|",
+        "  http.request(request)",
+        "end",
+        "",
+        "puts response.code, response.body",
+      ].join("\n");
   }
 }
 
-function highlightCode(code: string, language: string): React.ReactNode[] {
-  const lines = code.split("\n");
-  return lines.map((line, lineIdx) => {
-    if (
-      (language === "bash" && line.trim().startsWith("#")) ||
-      (language === "go" &&
-        (line.trim().startsWith("//") || line.trim().startsWith("/*"))) ||
-      (language === "typescript" && line.trim().startsWith("//")) ||
-      (language === "javascript" && line.trim().startsWith("//")) ||
-      (language === "python" && line.trim().startsWith("#")) ||
-      (language === "java" &&
-        (line.trim().startsWith("//") || line.trim().startsWith("*"))) ||
-      (language === "php" &&
-        (line.trim().startsWith("//") || line.trim().startsWith("#"))) ||
-      (language === "ruby" && line.trim().startsWith("#"))
-    ) {
-      return (
-        <div key={lineIdx} className="code-line">
-          <span className="line-num">{lineIdx + 1}</span>
-          <span className="token-comment">{line}</span>
-        </div>
-      );
-    }
+/* ---------------- syntax highlighting ---------------- */
 
-    return (
-      <div key={lineIdx} className="code-line">
-        <span className="line-num">{lineIdx + 1}</span>
-        {renderTokens(line, language)}
-      </div>
-    );
-  });
+type Syntax = LangId | "json";
+
+const KEYWORDS = new Set([
+  "import",
+  "package",
+  "func",
+  "return",
+  "var",
+  "const",
+  "let",
+  "if",
+  "else",
+  "defer",
+  "for",
+  "range",
+  "from",
+  "await",
+  "async",
+  "def",
+  "class",
+  "public",
+  "static",
+  "void",
+  "throws",
+  "new",
+  "try",
+  "require",
+  "do",
+  "end",
+  "echo",
+  "nil",
+  "None",
+  "true",
+  "false",
+  "null",
+  "string",
+  "String",
+  "unknown",
+  "main",
+  "puts",
+  "print",
+  "true",
+  "false",
+]);
+
+const STRING_SRC = /"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|`[^`]*`/.source;
+const NUMBER_SRC = /\b\d+(?:\.\d+)?\b/.source;
+const WORD_SRC = /[A-Za-z_$][\w$]*/.source;
+
+const commentSource = (syntax: Syntax) => {
+  if (syntax === "json") return /(?!)/.source;
+  if (["python", "curl", "ruby"].includes(syntax)) return /#.*/.source;
+  return /\/\/.*/.source;
+};
+
+const tokenRegex = (syntax: Syntax) =>
+  new RegExp(
+    `(${commentSource(syntax)})|(${STRING_SRC})|(${NUMBER_SRC})|(${WORD_SRC})|(\\s+)|([\\s\\S])`,
+    "g",
+  );
+
+function tokenize(line: string, syntax: Syntax, re: RegExp): ReactNode[] {
+  const out: ReactNode[] = [];
+  for (const m of line.matchAll(re)) {
+    const text = m[0];
+    const key = out.length;
+    const after = line.slice((m.index ?? 0) + text.length);
+
+    if (m[1])
+      out.push(
+        <span key={key} className="t-comment">
+          {text}
+        </span>,
+      );
+    else if (m[2]) {
+      const isKey = syntax === "json" && after.trimStart().startsWith(":");
+      out.push(
+        <span key={key} className={isKey ? "t-key" : "t-string"}>
+          {text}
+        </span>,
+      );
+    } else if (m[3])
+      out.push(
+        <span key={key} className="t-number">
+          {text}
+        </span>,
+      );
+    else if (m[4]) {
+      let cls = "t-var";
+      if (syntax === "json" && /^(true|false|null)$/.test(text))
+        cls = "t-number";
+      else if (KEYWORDS.has(text) && syntax !== "json") cls = "t-keyword";
+      else if (after.startsWith("(")) cls = "t-fn";
+      else if (/^[A-Z][A-Za-z0-9]*$/.test(text) && syntax !== "json")
+        cls = "t-type";
+      out.push(
+        <span key={key} className={cls}>
+          {text}
+        </span>,
+      );
+    } else if (m[5]) out.push(text);
+    else
+      out.push(
+        <span key={key} className="t-punct">
+          {text}
+        </span>,
+      );
+  }
+  return out;
 }
 
-function renderTokens(line: string, _language: string) {
-  const keywordSet = new Set([
-    "import",
-    "package",
-    "func",
-    "return",
-    "var",
-    "const",
-    "if",
-    "else",
-    "defer",
-    "go",
-    "range",
-    "for",
-    "type",
-    "struct",
-    "map",
-    "any",
-    "interface",
-    "chan",
-    "from",
-    "await",
-    "async",
-    "def",
-    "print",
-    "class",
-    "public",
-    "private",
-    "new",
-    "throws",
-    "try",
-    "catch",
-    "echo",
-    "require",
-    "do",
-    "end",
-    "nil",
-    "true",
-    "false",
-    "null",
-  ]);
+function Code({ code, syntax }: { code: string; syntax: Syntax }) {
+  const lines = useMemo(() => {
+    const re = tokenRegex(syntax);
+    return code.split("\n").map((line) => tokenize(line, syntax, re));
+  }, [code, syntax]);
 
-  const tokens = line
-    .split(/(\s+|["'`].*?["'`]|[(){}\[\].,:=+\-*/%])/g)
-    .filter(Boolean);
-
-  return tokens.map((token, i) => {
-    if (!token) return null;
-
-    if (
-      (token.startsWith('"') && token.endsWith('"')) ||
-      (token.startsWith("'") && token.endsWith("'")) ||
-      (token.startsWith("`") && token.endsWith("`"))
-    ) {
-      return (
-        <span key={i} className="token-string">
-          {token}
-        </span>
-      );
-    }
-
-    if (keywordSet.has(token)) {
-      return (
-        <span key={i} className="token-keyword">
-          {token}
-        </span>
-      );
-    }
-
-    if (/^\d+(\.\d+)?$/.test(token)) {
-      return (
-        <span key={i} className="token-number">
-          {token}
-        </span>
-      );
-    }
-
-    if (i + 1 < tokens.length && tokens[i + 1] === "(") {
-      return (
-        <span key={i} className="token-function">
-          {token}
-        </span>
-      );
-    }
-
-    if (/^[A-Z][a-zA-Z0-9_]*$/.test(token)) {
-      return (
-        <span key={i} className="token-type">
-          {token}
-        </span>
-      );
-    }
-
-    if (/^[(){}\[\].,:=+\-*/%<>!&|]$/.test(token)) {
-      return (
-        <span key={i} className="token-punctuation">
-          {token}
-        </span>
-      );
-    }
-
-    return (
-      <span key={i} className="token-variable">
-        {token}
-      </span>
-    );
-  });
-}
-
-function highlightJson(jsonStr: string): React.ReactNode[] {
-  const lines = jsonStr.split("\n");
-  return lines.map((line, idx) => (
-    <div key={idx} className="code-line">
-      <span className="line-num">{idx + 1}</span>
-      {line.split(/([{}\[\],:]|"[^"]*")/g).map((part, pIdx) => {
-        if (!part) return null;
-        if (part.startsWith('"') && part.endsWith('"')) {
-          if (line.includes(":") && line.indexOf(part) < line.indexOf(":")) {
-            return (
-              <span key={pIdx} className="token-json-key">
-                {part}
-              </span>
-            );
-          }
-          return (
-            <span key={pIdx} className="token-string">
-              {part}
-            </span>
-          );
-        }
-        if (/true|false|null/.test(part)) {
-          return (
-            <span key={pIdx} className="token-boolean">
-              {part}
-            </span>
-          );
-        }
-        if (/^\s*\d+(\.\d+)?\s*$/.test(part)) {
-          return (
-            <span key={pIdx} className="token-number">
-              {part}
-            </span>
-          );
-        }
-        if (/[{\]}\[\]:,]/.test(part)) {
-          return (
-            <span key={pIdx} className="token-punctuation">
-              {part}
-            </span>
-          );
-        }
-        return (
-          <span key={pIdx} className="token-variable">
-            {part}
+  return (
+    <pre className="qs-pre">
+      <code>
+        {lines.map((tokens, i) => (
+          <span
+            className="qs-line"
+            key={i}
+            style={css({ "--n": Math.min(i, 28) })}
+          >
+            {tokens.length ? tokens : " "}
           </span>
-        );
-      })}
-    </div>
-  ));
+        ))}
+      </code>
+    </pre>
+  );
 }
+
+/* ---------------- small parts ---------------- */
+
+function useCopy(text: string) {
+  const [copied, setCopied] = useState(false);
+  const timer = useRef<number | undefined>(undefined);
+
+  useEffect(() => () => window.clearTimeout(timer.current), []);
+
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      window.clearTimeout(timer.current);
+      timer.current = window.setTimeout(() => setCopied(false), 1800);
+    } catch {
+      /* clipboard unavailable: leave the label unchanged */
+    }
+  };
+
+  return [copied, copy] as const;
+}
+
+function Logo({ src, name }: { src: string; name: string }) {
+  const [ok, setOk] = useState(true);
+  return (
+    <span className="qs-logo">
+      {ok ? (
+        <img src={src} alt="" draggable={false} onError={() => setOk(false)} />
+      ) : (
+        <b aria-hidden="true">{name[0]}</b>
+      )}
+    </span>
+  );
+}
+
+function cycle<T extends { id: string }>(
+  items: T[],
+  current: string,
+  event: KeyboardEvent,
+): string | null {
+  const keys = ["ArrowRight", "ArrowDown", "ArrowLeft", "ArrowUp"];
+  if (!keys.includes(event.key)) return null;
+  event.preventDefault();
+  const step = event.key === "ArrowRight" || event.key === "ArrowDown" ? 1 : -1;
+  const index = items.findIndex((item) => item.id === current);
+  return items[(index + step + items.length) % items.length].id;
+}
+
+/* ---------------- section ---------------- */
 
 export default function QuickStartSection() {
-  const prefersReducedMotion = useReducedMotion();
-  const [activeLang, setActiveLang] = useState<string>("go");
-  const [activeProvider, setActiveProvider] = useState<string>("openai");
-  const [copiedCode, setCopiedCode] = useState(false);
-  const [copiedResponse, setCopiedResponse] = useState(false);
+  const reduceMotion = Boolean(useReducedMotion());
+  const windowRef = useRef<HTMLDivElement>(null);
+  const visible = useInView(windowRef, { amount: 0.05 });
 
-  const currentExample = getCodeExample(activeLang, activeProvider);
-  const routeLabel = getProviderConfig(activeProvider).endpoint;
+  const [lang, setLang] = useState<LangId>("go");
+  const [providerId, setProviderId] = useState<ProviderId>("openai");
 
-  const handleCopyCode = async () => {
-    try {
-      await navigator.clipboard.writeText(currentExample.code);
-      setCopiedCode(true);
-      setTimeout(() => setCopiedCode(false), 2000);
-    } catch {
-      // no-op
-    }
-  };
+  const provider = PROVIDERS.find((p) => p.id === providerId) ?? PROVIDERS[0];
+  const code = useMemo(() => generate(lang, provider), [lang, provider]);
+  const syntax: Syntax = lang === "curl" ? "curl" : lang;
 
-  const handleCopyResponse = async () => {
-    try {
-      await navigator.clipboard.writeText(currentExample.response);
-      setCopiedResponse(true);
-      setTimeout(() => setCopiedResponse(false), 2000);
-    } catch {
-      // no-op
-    }
-  };
+  const [copiedCode, copyCode] = useCopy(code);
+  const [copiedJson, copyJson] = useCopy(provider.response);
 
   return (
     <section
-      className="problem-solution-section quickstart-section"
-      data-chapter="05 / QUICK START"
+      className="qs-section"
       id="quickstart"
+      data-chapter="05 / QUICK START"
     >
-      <motion.div
-        className="problem-accent-line"
-        initial={prefersReducedMotion ? false : { scaleX: 0, opacity: 0 }}
-        whileInView={
-          prefersReducedMotion ? undefined : { scaleX: 1, opacity: 1 }
-        }
-        viewport={{ once: true, amount: 0.35 }}
-        transition={{ duration: 1.15, ease: [0.22, 1, 0.36, 1] }}
-        aria-hidden="true"
-      />
-
-      <div className="problem-solution-inner">
-        <div className="problem-solution-copy">
-          <p className="problem-solution-eyebrow">GET STARTED</p>
+      <div className="qs-inner">
+        <motion.div
+          className="qs-copy"
+          initial={reduceMotion ? false : { opacity: 0, y: 16 }}
+          whileInView={reduceMotion ? undefined : { opacity: 1, y: 0 }}
+          viewport={{ once: true, amount: 0.3 }}
+          transition={{ duration: 0.8, ease }}
+        >
+          <p className="qs-eyebrow">GET STARTED</p>
           <h2>Your first request. Through Setu.</h2>
-          <p className="problem-description">
+          <p className="qs-lede">
             Connect your application to Setu and route requests through one
             unified gateway.
           </p>
-        </div>
+        </motion.div>
 
-        <div className="workspace-container">
-          <div className="workspace-toolbar">
-            <div className="selector-group">
-              <span className="selector-label">Language:</span>
-              <div className="toolbar-scrollable-row">
-                {LANGUAGES.map((lang) => (
+        <motion.div
+          ref={windowRef}
+          className={`qs-window${visible ? "" : " is-paused"}`}
+          initial={reduceMotion ? false : { opacity: 0, y: 28 }}
+          whileInView={reduceMotion ? undefined : { opacity: 1, y: 0 }}
+          viewport={{ once: true, amount: 0.12 }}
+          transition={{ duration: 0.9, ease }}
+        >
+          <div className="qs-controls">
+            <div className="qs-row">
+              <span className="qs-label" id="qs-lang-label">
+                Language
+              </span>
+              <div
+                className="qs-scroll"
+                role="tablist"
+                aria-labelledby="qs-lang-label"
+                onKeyDown={(e) => {
+                  const next = cycle(LANGUAGES, lang, e);
+                  if (next) setLang(next as LangId);
+                }}
+              >
+                {LANGUAGES.map((l) => (
                   <button
-                    key={lang.id}
-                    onClick={() => setActiveLang(lang.id)}
-                    className={`toolbar-tab ${activeLang === lang.id ? "is-active" : ""}`}
+                    key={l.id}
                     type="button"
-                    aria-pressed={activeLang === lang.id}
+                    role="tab"
+                    aria-selected={lang === l.id}
+                    tabIndex={lang === l.id ? 0 : -1}
+                    className={lang === l.id ? "is-active" : ""}
+                    onClick={() => setLang(l.id)}
                   >
-                    <span className="tab-icon">{lang.icon}</span>
-                    <span className="tab-text">{lang.label}</span>
+                    {l.label}
                   </button>
                 ))}
               </div>
             </div>
 
-            <div className="selector-group provider-group">
-              <span className="selector-label">Provider:</span>
-              <div className="toolbar-scrollable-row">
-                {PROVIDERS.map((prov) => (
+            <div className="qs-row">
+              <span className="qs-label" id="qs-provider-label">
+                Provider
+              </span>
+              <div
+                className="qs-scroll"
+                role="radiogroup"
+                aria-labelledby="qs-provider-label"
+                onKeyDown={(e) => {
+                  const next = cycle(PROVIDERS, providerId, e);
+                  if (next) setProviderId(next as ProviderId);
+                }}
+              >
+                {PROVIDERS.map((p) => (
                   <button
-                    key={prov.id}
-                    onClick={() => setActiveProvider(prov.id)}
-                    className={`toolbar-tab provider-tab ${activeProvider === prov.id ? "is-active" : ""}`}
+                    key={p.id}
                     type="button"
-                    aria-pressed={activeProvider === prov.id}
+                    role="radio"
+                    aria-checked={providerId === p.id}
+                    tabIndex={providerId === p.id ? 0 : -1}
+                    className={providerId === p.id ? "is-active" : ""}
+                    onClick={() => setProviderId(p.id)}
                   >
-                    <span className="tab-icon">{prov.icon}</span>
-                    <span className="tab-text">{prov.label}</span>
+                    <Logo src={p.logo} name={p.label} />
+                    {p.label}
                   </button>
                 ))}
               </div>
             </div>
           </div>
 
-          <div className="workspace-grid">
-            <div className="workspace-panel">
-              <div className="panel-header">
-                <span className="panel-label">
-                  REQUEST ({activeLang.toUpperCase()} →{" "}
-                  {activeProvider.toUpperCase()})
+          {/* the route, in miniature: your app, Setu, the chosen provider */}
+          <div
+            className="qs-route"
+            aria-label={`Your app to Setu to ${provider.label}`}
+          >
+            <span className="qs-node">Your app</span>
+            <span className="qs-link">
+              <i />
+            </span>
+            <span className="qs-node qs-node-setu">
+              <img src="/Setu_Icon.svg" alt="" />
+              Setu
+              <b aria-hidden="true" />
+            </span>
+            <span className="qs-link qs-link-2">
+              <i />
+            </span>
+            <span className="qs-node" key={provider.id}>
+              <Logo src={provider.logo} name={provider.label} />
+              {provider.label}
+            </span>
+            <span className="qs-endpoint">POST {provider.endpoint}</span>
+          </div>
+
+          <div className="qs-grid">
+            <div className="qs-panel">
+              <div className="qs-head">
+                <span className="qs-title">
+                  REQUEST{" "}
+                  <em>
+                    {LANGUAGES.find((l) => l.id === lang)?.label} →{" "}
+                    {provider.label}
+                  </em>
                 </span>
                 <button
-                  onClick={handleCopyCode}
-                  className={`copy-btn ${copiedCode ? "is-copied" : ""}`}
-                  aria-label="Copy request code"
                   type="button"
+                  className={`qs-copy-btn${copiedCode ? " is-copied" : ""}`}
+                  onClick={copyCode}
                 >
-                  {copiedCode ? (
-                    <span className="copy-success-flex">
-                      <svg
-                        className="w-3 h-3 text-emerald-400"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                        strokeWidth="2.5"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          d="M5 13l4 4L19 7"
-                        />
-                      </svg>
-                      Copied!
-                    </span>
-                  ) : (
-                    "Copy code"
-                  )}
+                  {copiedCode ? "Copied" : "Copy code"}
                 </button>
               </div>
-              <div className="code-container">
-                <AnimatePresence mode="wait">
-                  <motion.pre
-                    key={`${activeLang}-${activeProvider}`}
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    transition={{ duration: 0.15, ease: "easeInOut" }}
-                    className="code-pre"
-                  >
-                    <code>
-                      {highlightCode(
-                        currentExample.code,
-                        currentExample.language,
-                      )}
-                    </code>
-                  </motion.pre>
-                </AnimatePresence>
+              <div
+                className="qs-code"
+                tabIndex={0}
+                role="region"
+                aria-label="Request example"
+              >
+                <Code
+                  key={`${lang}-${provider.id}`}
+                  code={code}
+                  syntax={syntax}
+                />
               </div>
             </div>
 
-            <div className="workspace-panel">
-              <div className="panel-header">
-                <div className="response-header-left">
-                  <span className="panel-label">RESPONSE</span>
-                  <span className="status-badge">
-                    <span className="status-dot" /> 200 OK
+            <div className="qs-panel">
+              <div className="qs-head">
+                <span className="qs-title">
+                  RESPONSE{" "}
+                  <span className="qs-status">
+                    <i aria-hidden="true" />
+                    200 OK
                   </span>
-                </div>
+                </span>
                 <button
-                  onClick={handleCopyResponse}
-                  className={`copy-btn ${copiedResponse ? "is-copied" : ""}`}
-                  aria-label="Copy response JSON"
                   type="button"
+                  className={`qs-copy-btn${copiedJson ? " is-copied" : ""}`}
+                  onClick={copyJson}
                 >
-                  {copiedResponse ? (
-                    <span className="copy-success-flex">
-                      <svg
-                        className="w-3 h-3 text-emerald-400"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                        strokeWidth="2.5"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          d="M5 13l4 4L19 7"
-                        />
-                      </svg>
-                      Copied!
-                    </span>
-                  ) : (
-                    "Copy JSON"
-                  )}
+                  {copiedJson ? "Copied" : "Copy JSON"}
                 </button>
               </div>
-              <div className="code-container">
-                <AnimatePresence mode="wait">
-                  <motion.pre
-                    key={`resp-${activeLang}-${activeProvider}`}
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    transition={{ duration: 0.15, ease: "easeInOut" }}
-                    className="code-pre response-pre"
-                  >
-                    <code>{highlightJson(currentExample.response)}</code>
-                  </motion.pre>
-                </AnimatePresence>
+              <div
+                className="qs-code"
+                tabIndex={0}
+                role="region"
+                aria-label="Response example"
+              >
+                <Code
+                  key={provider.id}
+                  code={provider.response}
+                  syntax="json"
+                />
               </div>
             </div>
           </div>
 
-          <div className="workspace-footer">
-            <span className="illustrative-note">
-              * Illustrative payload. Setu routes OpenAI, Anthropic, and Gemini
-              through provider-aware headers.
+          <p className="qs-footer" aria-live="polite">
+            <span>
+              Illustrative request and response. Replace SETU_API_KEY with your
+              own key.
             </span>
-            <span className="endpoint-meta">POST {routeLabel}</span>
-          </div>
-        </div>
+            <span className="sr-only">
+              {copiedCode || copiedJson ? "Copied to clipboard" : ""}
+            </span>
+          </p>
+        </motion.div>
       </div>
 
       <style>{`
-        .quickstart-section {
+        .qs-section {
           position: relative;
-          background: #070707;
-          padding: 60px 0 90px;
+          margin-left: clamp(20px, 6.5vw, 88px);
+          margin-right: clamp(20px, 2.5vw, 32px);
+          border-left: 1px solid #19191d;
+          border-bottom: 1px solid #19191d;
+          background: #050505;
+          font-family: "Geist", sans-serif;
         }
 
-        .workspace-container {
-          position: relative;
-          margin-top: 40px;
-          background: #090b0d;
-          border: 1px solid #293137;
-          border-radius: 0;
-          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.02);
+        .qs-inner {
+          max-width: 1180px;
+          margin: 0 auto;
+          padding: clamp(80px, 10vw, 128px) clamp(22px, 6vw, 96px) 88px;
+        }
+
+        .qs-eyebrow {
+          margin: 0 0 18px;
+          color: #8f8f97;
+          font-family: "JetBrains Mono", monospace;
+          font-size: 11px;
+          letter-spacing: 0.16em;
+        }
+
+        .qs-copy h2 {
+          max-width: 720px;
+          margin: 0;
+          color: #f7f7f7;
+          font-size: clamp(32px, 4vw, 52px);
+          font-weight: 600;
+          letter-spacing: -0.06em;
+          line-height: 1.04;
+        }
+
+        .qs-lede { max-width: 520px; margin: 20px 0 0; color: #969ba3; font-size: 14px; line-height: 1.6; }
+
+        .sr-only {
+          position: absolute;
+          width: 1px;
+          height: 1px;
           overflow: hidden;
+          clip: rect(0 0 0 0);
+          white-space: nowrap;
         }
 
-        .workspace-container::before {
+        /* ---- window ---- */
+        .qs-window {
+          position: relative;
+          margin-top: 56px;
+          border: 1px solid #1f1f28;
+          background: #07070a;
+        }
+
+        .qs-window::before {
           position: absolute;
           top: -1px;
           left: 20px;
@@ -974,306 +799,272 @@ export default function QuickStartSection() {
           height: 1px;
           content: "";
           background: #67e8f9;
-          pointer-events: none;
         }
 
-        .workspace-toolbar {
-          display: flex;
-          flex-direction: column;
-          gap: 16px;
-          background: #0a0a0f;
-          border-bottom: 1px solid #1f1f28;
-          padding: 16px 20px;
-        }
+        .qs-controls { display: grid; gap: 14px; padding: 16px 20px; border-bottom: 1px solid #1f1f28; background: #0a0a0f; }
 
-        @media (min-width: 1024px) {
-          .workspace-toolbar {
-            flex-direction: row;
-            align-items: center;
-            justify-content: space-between;
-            gap: 24px;
-          }
-        }
+        .qs-row { display: flex; align-items: center; gap: 16px; min-width: 0; }
 
-        .selector-group {
-          display: flex;
-          align-items: center;
-          gap: 14px;
-          width: 100%;
-          min-width: 0;
-        }
-
-        @media (min-width: 1024px) {
-          .selector-group {
-            width: auto;
-            flex: 1;
-          }
-          .selector-group.provider-group {
-            flex: 0.8;
-          }
-        }
-
-        .selector-label {
-          font-family: "JetBrains Mono", monospace;
-          font-size: 9px;
-          letter-spacing: 0.1em;
-          text-transform: uppercase;
-          color: #787d89;
-          white-space: nowrap;
-          flex-shrink: 0;
-        }
-
-        .toolbar-scrollable-row {
-          display: flex;
-          gap: 6px;
-          overflow-x: auto;
-          scrollbar-width: none;
-          padding-bottom: 2px;
-          width: 100%;
-          min-width: 0;
-        }
-
-        .toolbar-scrollable-row::-webkit-scrollbar {
-          display: none;
-        }
-
-        .toolbar-tab {
-          display: inline-flex;
-          align-items: center;
-          gap: 8px;
-          background: rgba(255, 255, 255, 0.01);
-          border: 1px solid #1f1f28;
-          color: #9ca3af;
-          font-family: "JetBrains Mono", monospace;
-          font-size: 10px;
-          letter-spacing: 0.06em;
-          text-transform: uppercase;
-          padding: 7px 12px;
-          border-radius: 0;
-          cursor: pointer;
-          transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-          white-space: nowrap;
-          flex-shrink: 0;
-        }
-
-        .toolbar-tab:hover {
-          background: rgba(255, 255, 255, 0.04);
-          color: #f5f5f5;
-          border-color: rgba(148, 163, 184, 0.2);
-        }
-
-        .toolbar-tab:focus-visible,
-        .copy-btn:focus-visible {
-          outline: 1px solid rgba(232, 121, 249, 0.7);
-          outline-offset: 2px;
-        }
-
-        .tab-icon {
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          transition: transform 0.2s ease;
-          width: 16px;
-          height: 16px;
-        }
-
-        .tab-text {
-          line-height: 1;
-        }
-
-        .toolbar-tab:hover .tab-icon {
-          transform: scale(1.05);
-        }
-
-        .toolbar-tab.is-active {
-          background: #15191b;
-          border-color: rgba(103, 232, 249, 0.42);
-          color: #f5f5f5;
-          box-shadow: inset 0 -1px 0 rgba(103, 232, 249, 0.7);
-        }
-
-        .workspace-grid {
-          display: grid;
-          grid-template-columns: 1fr 1fr;
-          gap: 1px;
-          background: #1f1f28;
-        }
-
-        .workspace-panel {
-          background: #07070a;
-          display: flex;
-          flex-direction: column;
-          min-width: 0;
-        }
-
-        .panel-header {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          padding: 12px 18px;
-          background: #09090e;
-          border-bottom: 1px solid #1f1f28;
-        }
-
-        .panel-label {
+        .qs-label {
+          flex: 0 0 72px;
+          color: #686873;
           font-family: "JetBrains Mono", monospace;
           font-size: 10px;
           letter-spacing: 0.12em;
           text-transform: uppercase;
-          color: #8c8f99;
-          white-space: nowrap;
-          overflow: hidden;
-          text-overflow: ellipsis;
         }
 
-        .response-header-left {
+        .qs-scroll { display: flex; gap: 4px; min-width: 0; overflow-x: auto; scrollbar-width: none; }
+        .qs-scroll::-webkit-scrollbar { display: none; }
+
+        .qs-scroll button {
+          position: relative;
+          display: inline-flex;
+          flex: 0 0 auto;
+          align-items: center;
+          gap: 8px;
+          padding: 8px 12px;
+          border: 1px solid transparent;
+          background: transparent;
+          color: #8f8f97;
+          font-family: "JetBrains Mono", monospace;
+          font-size: 11px;
+          letter-spacing: 0.04em;
+          cursor: pointer;
+          transition: color 200ms ease, background 200ms ease, border-color 200ms ease;
+        }
+
+        .qs-scroll button:hover { color: #f5f5f5; background: #0d0d11; }
+
+        .qs-scroll button.is-active {
+          border-color: #27272d;
+          background: #111318;
+          color: #f7f7f7;
+        }
+
+        .qs-scroll button.is-active::after {
+          position: absolute;
+          right: -1px;
+          bottom: -1px;
+          left: -1px;
+          height: 1px;
+          content: "";
+          background: #67e8f9;
+        }
+
+        .qs-scroll button:focus-visible,
+        .qs-copy-btn:focus-visible,
+        .qs-code:focus-visible { outline: 2px solid #f0abfc; outline-offset: 2px; }
+
+        .qs-logo { display: grid; flex: 0 0 18px; width: 18px; height: 18px; place-items: center; background: #e4e4e7; }
+        .qs-logo img { width: 13px; height: 13px; object-fit: contain; }
+        .qs-logo b { color: #08070b; font-size: 10px; font-weight: 600; }
+
+        /* ---- route strip ---- */
+        .qs-route {
           display: flex;
+          align-items: center;
+          padding: 18px 20px;
+          border-bottom: 1px solid #1f1f28;
+        }
+
+        .qs-node {
+          display: inline-flex;
+          flex: 0 0 auto;
+          align-items: center;
+          gap: 8px;
+          height: 34px;
+          padding: 0 12px;
+          border: 1px solid #27272d;
+          background: #0d0d11;
+          color: #e4e4e7;
+          font-family: "JetBrains Mono", monospace;
+          font-size: 11px;
+          white-space: nowrap;
+          animation: qs-fade 400ms ease backwards;
+        }
+
+        .qs-node-setu { position: relative; border-color: #3a4247; }
+        .qs-node-setu img { width: 16px; height: 16px; object-fit: contain; }
+
+        /* the section's one orchid mark: the gateway's port */
+        .qs-node-setu b { position: absolute; top: 50%; right: -2px; width: 3px; height: 18px; background: #e879f9; transform: translateY(-50%); }
+
+        .qs-link { position: relative; flex: 1; min-width: 20px; max-width: 160px; height: 1px; overflow: hidden; background: #3a4247; }
+
+        .qs-link i {
+          position: absolute;
+          top: 0;
+          left: -28px;
+          width: 28px;
+          height: 1px;
+          background: #67e8f9;
+          animation: qs-hop 3.6s cubic-bezier(0.45, 0, 0.2, 1) infinite;
+        }
+
+        .qs-link-2 i { animation-delay: 0.9s; }
+
+        .qs-endpoint {
+          margin-left: auto;
+          padding-left: 20px;
+          overflow: hidden;
+          color: #8f8f97;
+          font-family: "JetBrains Mono", monospace;
+          font-size: 10px;
+          letter-spacing: 0.04em;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+
+        /* ---- panels ---- */
+        .qs-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: #1f1f28; }
+        .qs-panel { display: flex; min-width: 0; flex-direction: column; background: #07070a; }
+
+        .qs-head {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 12px;
+          padding: 11px 18px;
+          border-bottom: 1px solid #1f1f28;
+          background: #09090e;
+        }
+
+        .qs-title {
+          display: inline-flex;
           align-items: center;
           gap: 12px;
           min-width: 0;
-        }
-
-        .status-badge {
-          display: inline-flex;
-          align-items: center;
-          gap: 6px;
+          overflow: hidden;
+          color: #8f8f97;
           font-family: "JetBrains Mono", monospace;
-          font-size: 9px;
-          color: #34D399;
-          background: rgba(52, 211, 153, 0.08);
-          border: 1px solid rgba(52, 211, 153, 0.2);
-          padding: 2px 6px;
-          border-radius: 0;
-          flex-shrink: 0;
+          font-size: 10px;
+          letter-spacing: 0.12em;
+          white-space: nowrap;
         }
 
-        .status-dot {
-          width: 5px;
-          height: 5px;
-          background: #34D399;
-          border-radius: 50%;
-          box-shadow: 0 0 6px rgba(52, 211, 153, 0.5);
-        }
+        .qs-title em { overflow: hidden; color: #565d66; font-style: normal; letter-spacing: 0.06em; text-overflow: ellipsis; }
 
-        .copy-btn {
+        .qs-status { display: inline-flex; align-items: center; gap: 6px; color: #5eead4; font-size: 10px; letter-spacing: 0.06em; }
+        .qs-status i { width: 5px; height: 5px; border-radius: 50%; background: #5eead4; }
+
+        .qs-copy-btn {
+          flex: 0 0 auto;
+          padding: 6px 10px;
+          border: 1px solid #27272d;
           background: transparent;
-          border: 1px solid #1f1f28;
-          color: #a7a7b1;
+          color: #a1a1aa;
           font-family: "JetBrains Mono", monospace;
           font-size: 9px;
-          letter-spacing: 0.06em;
+          letter-spacing: 0.08em;
           text-transform: uppercase;
-          padding: 5px 10px;
           cursor: pointer;
-          transition: all 0.15s cubic-bezier(0.16, 1, 0.3, 1);
-          flex-shrink: 0;
+          transition: color 180ms ease, border-color 180ms ease, background 180ms ease;
         }
 
-        .copy-btn:hover {
-          background: rgba(255, 255, 255, 0.04);
-          color: #f5f5f5;
-          border-color: rgba(148, 163, 184, 0.3);
-        }
+        .qs-copy-btn:hover { border-color: #3a4247; background: #0d0d11; color: #f5f5f5; }
+        .qs-copy-btn.is-copied { border-color: rgba(94, 234, 212, 0.4); color: #5eead4; }
 
-        .copy-btn.is-copied {
-          border-color: rgba(52, 211, 153, 0.4);
-          background: rgba(52, 211, 153, 0.06);
-          color: #34D399;
-        }
-
-        .copy-success-flex {
-          display: inline-flex;
-          align-items: center;
-          gap: 5px;
-        }
-
-        .code-container {
-          padding: 18px;
-          overflow-x: auto;
+        .qs-code {
+          height: 400px;
+          padding: 18px 0;
+          overflow: auto;
           background: #050505;
-          flex: 1;
-          max-height: 420px;
           scrollbar-width: thin;
-          scrollbar-color: #1f1f28 transparent;
+          scrollbar-color: #202026 transparent;
         }
 
-        .code-container::-webkit-scrollbar {
-          height: 6px;
-          width: 6px;
-        }
-
-        .code-container::-webkit-scrollbar-thumb {
-          background: #1f1f28;
-        }
-
-        .code-pre {
+        .qs-pre {
           margin: 0;
           font-family: "JetBrains Mono", monospace;
-          font-size: 11.5px;
-          line-height: 1.65;
+          font-size: 12px;
+          line-height: 1.7;
+          tab-size: 4;
+          counter-reset: line;
+        }
+
+        .qs-pre code { display: block; width: max-content; min-width: 100%; }
+
+        .qs-line {
+          position: relative;
+          display: block;
+          min-height: 1.7em;
+          padding: 0 18px 0 56px;
+          color: #e2e8f0;
           white-space: pre;
+          animation: qs-line 360ms cubic-bezier(0.16, 1, 0.3, 1) backwards;
+          animation-delay: calc(var(--n) * 12ms);
         }
 
-        .code-line {
-          display: flex;
-          align-items: center;
-          min-height: 1.65em;
-        }
-
-        .line-num {
-          display: inline-block;
-          width: 28px;
-          user-select: none;
+        .qs-line::before {
+          position: absolute;
+          left: 0;
+          width: 38px;
+          content: counter(line);
+          counter-increment: line;
+          color: #3a4247;
+          font-size: 11px;
           text-align: right;
-          margin-right: 18px;
-          color: #3f424e;
-          font-size: 10.5px;
-          flex-shrink: 0;
+          user-select: none;
         }
 
-        /* Professional Dark Theme Syntax Palette */
-        .token-keyword { color: #c084fc; font-weight: 500; }
-        .token-string { color: #34d399; }
-        .token-function { color: #67e8f9; }
-        .token-number { color: #f59e0b; }
-        .token-boolean { color: #f59e0b; }
-        .token-type { color: #60a5fa; }
-        .token-comment { color: #6b7280; font-style: italic; }
-        .token-punctuation { color: #9ca3af; }
-        .token-variable { color: #e2e8f0; }
-        .token-json-key { color: #93c5fd; }
+        .t-keyword { color: #c084fc; }
+        .t-string { color: #5eead4; }
+        .t-number { color: #f59e0b; }
+        .t-fn { color: #67e8f9; }
+        .t-type { color: #7db7ff; }
+        .t-key { color: #a5c4f3; }
+        .t-comment { color: #686873; font-style: italic; }
+        .t-punct { color: #8f8f97; }
+        .t-var { color: #e2e8f0; }
 
-        .workspace-footer {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
+        .qs-footer {
+          margin: 0;
           padding: 12px 18px;
-          background: #09090e;
           border-top: 1px solid #1f1f28;
-        }
-
-        .illustrative-note {
+          background: #09090e;
+          color: #686873;
           font-family: "JetBrains Mono", monospace;
-          font-size: 9px;
-          color: #787d89;
+          font-size: 10px;
           letter-spacing: 0.03em;
         }
 
-        .endpoint-meta {
-          font-family: "JetBrains Mono", monospace;
-          font-size: 9px;
-          color: #9ca3af;
-          letter-spacing: 0.05em;
+        .qs-window.is-paused * { animation-play-state: paused !important; }
+
+        @keyframes qs-hop {
+          0% { transform: translateX(0); opacity: 0; }
+          12% { opacity: 1; }
+          55% { opacity: 1; }
+          70%, 100% { transform: translateX(190px); opacity: 0; }
+        }
+        @keyframes qs-line { from { opacity: 0; transform: translateX(-6px); } }
+        @keyframes qs-fade { from { opacity: 0; } }
+
+        /* ---- responsive ---- */
+        @media (max-width: 900px) {
+          .qs-grid { grid-template-columns: 1fr; }
+          .qs-code { height: 340px; }
+          .qs-endpoint { display: none; }
         }
 
-        @media (max-width: 900px) {
-          .workspace-grid {
-            grid-template-columns: 1fr;
-          }
-          
-          .endpoint-meta {
-            display: none;
-          }
+        @media (max-width: 700px) {
+          .qs-section { margin-left: 0; margin-right: 0; border-left: 0; }
+          .qs-inner { padding: 72px 20px 56px; }
+          .qs-copy h2 { font-size: clamp(32px, 10vw, 44px); }
+          .qs-window { margin-top: 40px; }
+          .qs-controls { padding: 14px; }
+          .qs-row { flex-direction: column; align-items: flex-start; gap: 8px; }
+          .qs-scroll { width: 100%; -webkit-mask-image: linear-gradient(90deg, #000 88%, transparent); mask-image: linear-gradient(90deg, #000 88%, transparent); }
+          .qs-route { padding: 14px; }
+          .qs-node { padding: 0 8px; font-size: 10px; }
+          .qs-node .qs-logo { display: none; }
+          .qs-head { padding: 10px 14px; }
+          .qs-line { padding-left: 48px; font-size: 11px; }
+          .qs-line::before { width: 30px; }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+          .qs-window * { animation: none !important; }
         }
       `}</style>
     </section>

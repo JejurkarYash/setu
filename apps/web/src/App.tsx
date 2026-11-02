@@ -1,11 +1,14 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { ProjectProvider } from "./context/ProjectContext";
 import { UserProvider } from "./context/UserContext";
+import ProtectedRoute from "./components/ProtectedRoute";
 import AppLayout from "./layouts/AppLayout";
 import LandingLayout from "./layouts/LandingLayout";
 import DashboardPage from "./pages/DashboardPage";
+import DocsPage from "./pages/DocsPage";
 import GlobalSettingsPage from "./pages/GlobalSettingsPage";
 import LandingPage from "./pages/landing/LandingPage";
+import LoginPage from "./pages/LoginPage";
 import ProjectOverviewPage from "./pages/project/ProjectOverviewPage";
 import ProjectKeysPage from "./pages/project/ProjectKeysPage";
 import ProjectLogsPage from "./pages/project/ProjectLogsPage";
@@ -20,9 +23,12 @@ export default function App() {
           <Routes>
           <Route element={<LandingLayout />}>
             <Route path="/" element={<LandingPage />} />
+            <Route path="/login" element={<LoginPage />} />
+            <Route path="/docs" element={<DocsPage />} />
           </Route>
 
-          <Route element={<AppLayout />}>
+          <Route element={<ProtectedRoute />}>
+            <Route element={<AppLayout />}>
             {/* Global Workspace Routes */}
             <Route path="/dashboard" element={<DashboardPage />} />
             <Route path="/dashboard/settings" element={<GlobalSettingsPage />} />
@@ -52,10 +58,10 @@ export default function App() {
               path="/dashboard/project/:projectId/settings"
               element={<ProjectSettingsPage />}
             />
+            </Route>
           </Route>
 
-          {/* Catch-all redirect to dashboard */}
-          <Route path="*" element={<Navigate to="/dashboard" replace />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </ProjectProvider>
       </UserProvider>

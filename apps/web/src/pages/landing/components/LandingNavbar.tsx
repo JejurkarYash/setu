@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import {
   AnimatePresence,
   motion,
@@ -8,7 +8,6 @@ import {
   useSpring,
 } from "framer-motion";
 
-const DOCS_URL = "https://docs.setu.dev";
 const GITHUB_URL = "https://github.com/JejurkarYash/setu";
 const ease = [0.16, 1, 0.3, 1] as const;
 
@@ -16,6 +15,11 @@ export default function LandingNavbar() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [stuck, setStuck] = useState(false);
   const reduceMotion = useReducedMotion();
+  const navigate = useNavigate();
+
+  const goToDashboard = () => {
+    navigate(localStorage.getItem("token") ? "/dashboard" : "/login");
+  };
 
   // The cyan hairline under the bar is the route: it advances as the page does.
   // Pure transform (scaleX), so scrolling never triggers layout.
@@ -59,14 +63,9 @@ export default function LandingNavbar() {
         </Link>
 
         <div className="landing-nav-links">
-          <a
-            href={DOCS_URL}
-            target="_blank"
-            rel="noreferrer"
-            className="landing-nav-link"
-          >
+          <Link to="/docs" className="landing-nav-link">
             Docs
-          </a>
+          </Link>
           <a
             href={GITHUB_URL}
             target="_blank"
@@ -78,9 +77,13 @@ export default function LandingNavbar() {
         </div>
 
         <div className="landing-nav-cta-wrap">
-          <Link to="/dashboard" className="landing-nav-cta">
+          <button
+            type="button"
+            onClick={goToDashboard}
+            className="landing-nav-cta cursor-pointer "
+          >
             Get Started
-          </Link>
+          </button>
         </div>
 
         <button
@@ -119,9 +122,9 @@ export default function LandingNavbar() {
             exit={{ opacity: 0, y: -8 }}
             transition={{ duration: 0.28, ease }}
           >
-            <a href={DOCS_URL} target="_blank" rel="noreferrer" onClick={close}>
+            <Link to="/docs" onClick={close}>
               Docs
-            </a>
+            </Link>
             <a
               href={GITHUB_URL}
               target="_blank"
@@ -130,9 +133,15 @@ export default function LandingNavbar() {
             >
               Github
             </a>
-            <Link to="/dashboard" onClick={close}>
+            <button
+              type="button"
+              onClick={() => {
+                close();
+                goToDashboard();
+              }}
+            >
               Get Started
-            </Link>
+            </button>
           </motion.div>
         )}
       </AnimatePresence>
