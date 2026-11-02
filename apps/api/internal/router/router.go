@@ -16,6 +16,7 @@ import (
 
 type RouterConfig struct {
 	Middleware     *middleware.Middleware
+	AllowedOrigins []string
 	GeminiHandler  *gemini.Handler
 	OpenAIHandler  *openai.Handler
 	Anthropic      *anthropic.Handler
@@ -29,9 +30,7 @@ func NewRouter(cfg *RouterConfig) *chi.Mux {
 	r := chi.NewRouter()
 	// registering cors
 	r.Use(cors.Handler(cors.Options{
-		AllowedOrigins: []string{
-			"http://localhost:5173", // Vite frontend
-		},
+		AllowedOrigins: cfg.AllowedOrigins,
 		AllowedMethods: []string{
 			"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS",
 		},

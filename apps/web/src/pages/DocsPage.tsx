@@ -12,6 +12,8 @@ const providers: { id: Provider; label: string; route: string; header: string }[
 ];
 
 const languages: Language[] = ["Go", "Python", "JavaScript / TypeScript", "Java"];
+const SETU_BASE_URL =
+  import.meta.env.VITE_SETU_BASE_URL || "http://localhost:8080";
 
 const guideSections = [
   ["introduction", "Introduction"],
@@ -41,7 +43,7 @@ completion, err := client.Chat.Completions.New(ctx, openai.ChatCompletionNewPara
 })`,
       after: `client := openai.NewClient(
   option.WithAPIKey(os.Getenv("SETU_API_KEY")),
-  option.WithBaseURL("http://localhost:8080/v1"),
+  option.WithBaseURL("${SETU_BASE_URL}/v1"),
 )
 
 completion, err := client.Chat.Completions.New(ctx, openai.ChatCompletionNewParams{
@@ -65,7 +67,7 @@ response = client.chat.completions.create(
 
 client = OpenAI(
     api_key=os.environ["SETU_API_KEY"],
-    base_url="http://localhost:8080/v1",
+    base_url="${SETU_BASE_URL}/v1",
 )
 response = client.chat.completions.create(
     model="gpt-4o-mini",
@@ -86,7 +88,7 @@ const response = await client.chat.completions.create({
 
 const client = new OpenAI({
   apiKey: process.env.SETU_API_KEY,
-  baseURL: "http://localhost:8080/v1",
+  baseURL: "${SETU_BASE_URL}/v1",
 });
 const response = await client.chat.completions.create({
   model: "gpt-4o-mini",
@@ -108,7 +110,7 @@ ChatCompletion response = client.chat().completions().create(
 );`,
       after: `OpenAIClient client = OpenAIOkHttpClient.builder()
     .apiKey(System.getenv("SETU_API_KEY"))
-    .baseUrl("http://localhost:8080/v1")
+    .baseUrl("${SETU_BASE_URL}/v1")
     .build();
 
 ChatCompletion response = client.chat().completions().create(
@@ -133,7 +135,7 @@ response, err := client.Models.GenerateContent(
       after: `// Setu exposes Gemini's REST shape. Use net/http when your
 // genai SDK version cannot override its base URL.
 req, _ := http.NewRequest("POST",
-  "http://localhost:8080/v1beta/models/gemini-2.5-flash:generateContent",
+  "${SETU_BASE_URL}/v1beta/models/gemini-2.5-flash:generateContent",
   strings.NewReader(\`{"contents":[{"parts":[{"text":"Hello"}]}]}\`))
 req.Header.Set("x-goog-api-key", os.Getenv("SETU_API_KEY"))
 req.Header.Set("Content-Type", "application/json")
@@ -151,7 +153,7 @@ response = client.models.generate_content(
       after: `import requests
 
 response = requests.post(
-    "http://localhost:8080/v1beta/models/gemini-2.5-flash:generateContent",
+    "${SETU_BASE_URL}/v1beta/models/gemini-2.5-flash:generateContent",
     headers={"x-goog-api-key": os.environ["SETU_API_KEY"]},
     json={"contents": [{"parts": [{"text": "Hello"}]}]},
 )`,
@@ -166,7 +168,7 @@ const response = await ai.models.generateContent({
   model: "gemini-2.5-flash", contents: "Hello",
 });`,
       after: `const response = await fetch(
-  "http://localhost:8080/v1beta/models/gemini-2.5-flash:generateContent",
+  "${SETU_BASE_URL}/v1beta/models/gemini-2.5-flash:generateContent",
   {
     method: "POST",
     headers: {
@@ -186,7 +188,7 @@ const response = await ai.models.generateContent({
 GenerateContentResponse response = client.models
     .generateContent("gemini-2.5-flash", "Hello", null);`,
       after: `HttpRequest request = HttpRequest.newBuilder()
-    .uri(URI.create("http://localhost:8080/v1beta/models/"
+    .uri(URI.create("${SETU_BASE_URL}/v1beta/models/"
         + "gemini-2.5-flash:generateContent"))
     .header("x-goog-api-key", System.getenv("SETU_API_KEY"))
     .header("Content-Type", "application/json")
@@ -213,7 +215,7 @@ message, err := client.Messages.New(ctx, anthropic.MessageNewParams{
 })`,
       after: `client := anthropic.NewClient(
   option.WithAPIKey(os.Getenv("SETU_API_KEY")),
-  option.WithBaseURL("http://localhost:8080/anthropic"),
+  option.WithBaseURL("${SETU_BASE_URL}/anthropic"),
 )
 message, err := client.Messages.New(ctx, anthropic.MessageNewParams{
   Model: anthropic.F("claude-3-5-sonnet-20241022"),
@@ -240,7 +242,7 @@ message = client.messages.create(
 
 client = anthropic.Anthropic(
     api_key=os.environ["SETU_API_KEY"],
-    base_url="http://localhost:8080/anthropic",
+    base_url="${SETU_BASE_URL}/anthropic",
 )
 message = client.messages.create(
     model="claude-3-5-sonnet-20241022",
@@ -265,7 +267,7 @@ const message = await client.messages.create({
 
 const client = new Anthropic({
   apiKey: process.env.SETU_API_KEY,
-  baseURL: "http://localhost:8080/anthropic",
+  baseURL: "${SETU_BASE_URL}/anthropic",
 });
 const message = await client.messages.create({
   model: "claude-3-5-sonnet-20241022",
@@ -288,7 +290,7 @@ Message message = client.messages().create(
 );`,
       after: `AnthropicClient client = AnthropicOkHttpClient.builder()
     .apiKey(System.getenv("SETU_API_KEY"))
-    .baseUrl("http://localhost:8080/anthropic")
+    .baseUrl("${SETU_BASE_URL}/anthropic")
     .build();
 Message message = client.messages().create(
     MessageCreateParams.builder()
@@ -427,7 +429,7 @@ export default function DocsPage() {
           <section id="quick-start" className="docs-section">
             <Heading index="01" title="Quick start" />
             <p>Create a project in the Setu dashboard, configure its provider credential and monthly budget, then copy the generated project API key. Point your existing SDK at your local or deployed Setu URL.</p>
-            <CodeBlock label="first request / OpenAI-compatible" code={`curl -X POST http://localhost:8080/v1/chat/completions \\
+            <CodeBlock label="first request / OpenAI-compatible" code={`curl -X POST ${SETU_BASE_URL}/v1/chat/completions \\
   -H "Authorization: Bearer YOUR_SETU_OPENAI_KEY" \\
   -H "Content-Type: application/json" \\
   -d '{"model":"gpt-4o-mini","messages":[{"role":"user","content":"Hello"}]}'`} />
@@ -491,7 +493,7 @@ function Heading({ index, title }: { index: string; title: string }) {
 
 function Comparison({ provider }: { provider: Provider }) {
   const keyName = provider === "gemini" ? "x-goog-api-key" : provider === "anthropic" ? "x-api-key" : "Authorization: Bearer";
-  return <div className="docs-comparison"><div><b>Configuration</b><b>Direct provider</b><b>Through Setu</b></div><div><span>Endpoint</span><code>Provider endpoint</code><code>http://localhost:8080{providers.find((item) => item.id === provider)?.route.replace("*", "…")}</code></div><div><span>Credential</span><code>Provider key</code><code>Setu project key ({keyName})</code></div><div><span>Application logic</span><code>Provider SDK</code><code>Same SDK or HTTP fallback</code></div></div>;
+  return <div className="docs-comparison"><div><b>Configuration</b><b>Direct provider</b><b>Through Setu</b></div><div><span>Endpoint</span><code>Provider endpoint</code><code>{SETU_BASE_URL}{providers.find((item) => item.id === provider)?.route.replace("*", "…")}</code></div><div><span>Credential</span><code>Provider key</code><code>Setu project key ({keyName})</code></div><div><span>Application logic</span><code>Provider SDK</code><code>Same SDK or HTTP fallback</code></div></div>;
 }
 
 const styles = `

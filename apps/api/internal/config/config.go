@@ -85,8 +85,20 @@ func LoadConfig() (*Config, error) {
 		return nil, err
 	}
 
-	// setting the CORS Domain
-	mainConfig.Server.CORSAllowedOrigins = []string{"http://googgle.com", "http://testing.com"}
+	allowedOrigins := strings.TrimSpace(os.Getenv("SETU_CORS_ORIGINS"))
+	if allowedOrigins == "" {
+		mainConfig.Server.CORSAllowedOrigins = []string{"http://localhost:5173"}
+	} else {
+		for _, origin := range strings.Split(allowedOrigins, ",") {
+			origin = strings.TrimSpace(origin)
+			if origin != "" {
+				mainConfig.Server.CORSAllowedOrigins = append(
+					mainConfig.Server.CORSAllowedOrigins,
+					origin,
+				)
+			}
+		}
+	}
 
 	return mainConfig, nil
 }

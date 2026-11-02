@@ -48,7 +48,8 @@ const LANGUAGES: { id: LangId; label: string }[] = [
 ];
 
 const PROMPT = "Hello through Setu gateway!";
-const HOST = "https://api.setu.dev";
+const HOST =
+  import.meta.env.VITE_SETU_BASE_URL || "http://localhost:8080";
 
 type Provider = {
   id: ProviderId;

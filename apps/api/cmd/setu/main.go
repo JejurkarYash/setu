@@ -112,6 +112,7 @@ func main() {
 	// constructing router config ( dependencies )
 	routerConfig := router.RouterConfig{
 		Middleware:     middleware,
+		AllowedOrigins: config.Server.CORSAllowedOrigins,
 		GeminiHandler:  geminiHandler,
 		OpenAIHandler:  openAIHandler,
 		Anthropic:      anthropicHandler,
