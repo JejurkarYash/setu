@@ -5,6 +5,7 @@ import React, {
   useState,
   useEffect,
 } from "react";
+import { useLocation } from "react-router-dom";
 import type { Project, ApiKey, Provider } from "../types";
 import {
   createProject as createProjectFromApi,
@@ -65,6 +66,7 @@ const STORAGE_KEYS = {
 export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
+  const location = useLocation();
   const [projects, setProjects] = useState<Project[]>([]);
   const [isLoadingProjects, setIsLoadingProjects] = useState(true);
   const [projectsError, setProjectsError] = useState<string | null>(null);
@@ -115,8 +117,10 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({
   }, []);
 
   useEffect(() => {
+    if (!localStorage.getItem("token")) return;
+
     void fetchProjects();
-  }, [fetchProjects]);
+  }, [fetchProjects, location.pathname]);
 
   useEffect(() => {
     try {

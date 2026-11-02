@@ -6,6 +6,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { useLocation } from "react-router-dom";
 import { fetchUserProfile, type UserProfile } from "../api/userApi";
 
 interface UserContextValue {
@@ -18,6 +19,7 @@ interface UserContextValue {
 const UserContext = createContext<UserContextValue | undefined>(undefined);
 
 export function UserProvider({ children }: { children: ReactNode }) {
+  const location = useLocation();
   const [user, setUser] = useState<UserProfile | null>(null);
   const [isLoadingUser, setIsLoadingUser] = useState(true);
   const [userError, setUserError] = useState<string | null>(null);
@@ -38,8 +40,10 @@ export function UserProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
+    if (!localStorage.getItem("token")) return;
+
     void fetchUser();
-  }, [fetchUser]);
+  }, [fetchUser, location.pathname]);
 
   return (
     <UserContext.Provider

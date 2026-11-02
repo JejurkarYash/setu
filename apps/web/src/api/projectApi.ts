@@ -30,7 +30,11 @@ export interface CreateProjectResponse {
 export async function fetchProjects(): Promise<Project[]> {
   const response = await api.get<ListProjectsResponse>("/projects");
 
-  return response.data.projects.map((project) => ({
+  const projects = Array.isArray(response.data.projects)
+    ? response.data.projects
+    : [];
+
+  return projects.map((project) => ({
     id: project.ID,
     name: project.Name,
     user_id: project.UserID,

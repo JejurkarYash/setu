@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
+import { createPortal } from "react-dom";
 import {
   LayoutGrid,
   Box,
@@ -219,6 +220,124 @@ function MobileNavItem({
   );
 }
 
+function SignOutDialog({
+  open,
+  onClose,
+  onConfirm,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+}) {
+  // Escape closes the dialog
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, onClose]);
+
+  return createPortal(
+    <AnimatePresence>
+      {open && (
+        <motion.div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-[8px]"
+          style={{ padding: 20 }}
+          role="presentation"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget) onClose();
+          }}
+        >
+          <motion.div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="sign-out-dialog-title"
+            aria-describedby="sign-out-dialog-description"
+            initial={{ opacity: 0, y: 10, scale: 0.97 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 8, scale: 0.98 }}
+            transition={{ duration: 0.18, ease: "easeOut" }}
+            className="relative w-full max-w-[480px] border border-[#222222] bg-[#121212] text-white shadow-[0_25px_50px_-12px_rgba(0,0,0,0.9)]"
+          >
+            {/* Header */}
+            <div
+              className="flex items-center justify-between border-b border-[#1f1f1f]"
+              style={{ padding: "14px 24px" }}
+            >
+              <div className="flex items-center gap-2.5">
+                <span className="size-2 shrink-0 rounded-full bg-[#34D399]" />
+                <h2
+                  id="sign-out-dialog-title"
+                  className="font-mono text-xs font-bold uppercase tracking-[0.08em] text-white"
+                  style={{ margin: 0 }}
+                >
+                  Sign out
+                </h2>
+              </div>
+              <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-zinc-600">
+                Session / 001
+              </span>
+            </div>
+
+            {/* Body */}
+            <div className="flex items-start gap-4" style={{ padding: 24 }}>
+              <div className="flex size-10 shrink-0 items-center justify-center border border-[#E879F9]/30 bg-[#E879F9]/10 text-[#E879F9]">
+                <LogOut className="size-[17px]" />
+              </div>
+              <div className="flex min-w-0 flex-col gap-2">
+                <h3
+                  className="text-[18px] font-semibold leading-tight tracking-[-0.02em] text-white"
+                  style={{ margin: 0 }}
+                >
+                  Sign out of Setu?
+                </h3>
+                <p
+                  id="sign-out-dialog-description"
+                  className="max-w-[360px] text-[13px] leading-5 text-zinc-400"
+                  style={{ margin: 0 }}
+                >
+                  Your current session will be cleared from this device. You can
+                  sign in again whenever you are ready.
+                </p>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div
+              className="flex items-center justify-end gap-3 border-t border-[#1f1f1f]"
+              style={{ padding: "16px 24px" }}
+            >
+              <button
+                type="button"
+                autoFocus
+                onClick={onClose}
+                className="h-10 cursor-pointer bg-transparent font-mono text-xs font-semibold text-zinc-400 transition-colors hover:text-white focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/40"
+                style={{ padding: "0 16px" }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={onConfirm}
+                className="inline-flex h-10 cursor-pointer items-center justify-center border border-[#262626] bg-[#141414] font-mono text-xs font-semibold text-white shadow-[0_2px_8px_rgba(0,0,0,0.4)] transition-colors hover:border-[#3a3a3a] hover:bg-[#1b1b1b] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#E879F9]"
+                style={{ padding: "0 24px" }}
+              >
+                Sign out
+              </button>
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>,
+    document.body,
+  );
+}
+
 export default function Sidebar({
   collapsed,
   onToggle,
@@ -227,6 +346,7 @@ export default function Sidebar({
   onToggle: () => void;
 }) {
   const [brandHovered, setBrandHovered] = useState(false);
+  const [isSignOutDialogOpen, setIsSignOutDialogOpen] = useState(false);
   const { user } = useUser();
   const location = useLocation();
   const navigate = useNavigate();
@@ -241,6 +361,11 @@ export default function Sidebar({
     isProjectContext && currentProjectId
       ? getProjectNavItems(currentProjectId)
       : globalNavItems;
+
+  const handleSignOut = () => {
+    localStorage.removeItem("token");
+    navigate("/", { replace: true });
+  };
 
   const isItemActive = (item: NavItem) => {
     if (item.path === "/dashboard") {
@@ -384,7 +509,8 @@ export default function Sidebar({
                   type="button"
                   title="Sign out"
                   aria-label="Sign out"
-                  className="p-1.5 text-zinc-400 hover:text-white transition-colors shrink-0 mr-2"
+                  onClick={() => setIsSignOutDialogOpen(true)}
+                  className="cursor-pointer p-1.5 text-zinc-400 hover:text-white transition-colors shrink-0 mr-2"
                 >
                   <LogOut className="size-4" />
                 </button>
@@ -410,6 +536,11 @@ export default function Sidebar({
           />
         ))}
       </motion.nav>
+      <SignOutDialog
+        open={isSignOutDialogOpen}
+        onClose={() => setIsSignOutDialogOpen(false)}
+        onConfirm={handleSignOut}
+      />
     </>
   );
 }

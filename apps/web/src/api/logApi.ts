@@ -48,5 +48,9 @@ export async function fetchProjectLogs(
     { params: { limit, offset } },
   );
 
-  return response.data.usage_logs.map((log) => normalizeLog(log, projectId));
+  const logs = Array.isArray(response.data.usage_logs)
+    ? response.data.usage_logs
+    : [];
+
+  return logs.map((log) => normalizeLog(log, projectId));
 }
