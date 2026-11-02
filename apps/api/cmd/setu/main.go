@@ -78,8 +78,13 @@ func main() {
 		os.Exit(1)
 	}
 
-	// redis initalization
-	rdb, err := redis.NewClient(config.Redis.Address)
+	// Redis initialization. Hosted providers use a URL; local development can
+	// continue using the address fallback.
+	redisURL := config.Redis.URL
+	if redisURL == "" {
+		redisURL = config.Redis.Address
+	}
+	rdb, err := redis.NewClient(redisURL)
 	if err != nil {
 		appLogger.Error("failed to init redis", slog.Any("err", err))
 	} else {

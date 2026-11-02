@@ -31,8 +31,19 @@ type Database struct {
 
 func New(cfg *config.Config, logger *slog.Logger) (*Database, error) {
 
-	// creating DSN string
-	dsn := fmt.Sprintf("postgres://%s:%s@%s:%d/%s?sslmode=%s", cfg.Database.User, cfg.Database.Password, cfg.Database.Host, cfg.Database.Port, cfg.Database.DBName, cfg.Database.SSLMode)
+	// Prefer a hosted provider connection URL, while retaining the separate
+	// fields used by local Docker development.
+	dsn := cfg.Database.URL
+	if dsn == "" {
+		dsn = fmt.Sprintf("postgres://%s:%s@%s:%d/%s?sslmode=%s",
+			cfg.Database.User,
+			cfg.Database.Password,
+			cfg.Database.Host,
+			cfg.Database.Port,
+			cfg.Database.DBName,
+			cfg.Database.SSLMode,
+		)
+	}
 
 	// parsing DSN string
 	poolConfig, err := pgxpool.ParseConfig(dsn)

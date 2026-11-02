@@ -31,6 +31,7 @@ type ServerConfig struct {
 	CORSAllowedOrigins []string `koanf:"corsAllowedOrigins"`
 }
 type RedisConfig struct {
+	URL     string `koanf:"url"`
 	Address string `koanf:"address"`
 }
 type Gemini struct {
@@ -42,6 +43,7 @@ type EncryptionConfig struct {
 }
 
 type DatabaseConfig struct {
+	URL             string `koanf:"url"`
 	Host            string `koanf:"host"`
 	Port            int    `koanf:"port"`
 	User            string `koanf:"user"`

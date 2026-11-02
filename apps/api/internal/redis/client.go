@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/redis/go-redis/v9"
@@ -27,11 +28,21 @@ type ModelRates struct {
 }
 
 // constructor function
-func NewClient(addr string) (*Client, error) {
+func NewClient(redisURL string) (*Client, error) {
+	var options *redis.Options
+	var err error
 
-	rdb := redis.NewClient(&redis.Options{
-		Addr: addr,
-	})
+	if strings.HasPrefix(redisURL, "redis://") ||
+		strings.HasPrefix(redisURL, "rediss://") {
+		options, err = redis.ParseURL(redisURL)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse redis URL: %w", err)
+		}
+	} else {
+		options = &redis.Options{Addr: redisURL}
+	}
+
+	rdb := redis.NewClient(options)
 
 	// ping the redis to make sure connection is alive
 	if err := rdb.Ping(context.Background()).Err(); err != nil {
