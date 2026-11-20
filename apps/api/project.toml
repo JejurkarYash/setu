@@ -1,0 +1,4 @@
+[build]
+[[build.env]]
+name = "GOOGLE_BUILDABLE"
+value = "./cmd/setu"
